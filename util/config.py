@@ -36,6 +36,8 @@ class DataConfig:
     train_fraction: float = 0.7
     val_fraction: float = 0.15
     test_fraction: float = 0.15
+    split_strategy: str = "random"
+    split_stratify_attribute: str = "aridity"
     train_basin_count: Optional[int] = None
     val_basin_count: Optional[int] = None
     test_basin_count: Optional[int] = None
@@ -96,6 +98,8 @@ def train_defaults_from_config(config: Mapping[str, Any]) -> Dict[str, Any]:
     _copy_if_present(defaults, data, "dynamic_inputs")
     _copy_if_present(defaults, data, "target_variable")
     _copy_if_present(defaults, data, "static_attributes")
+    _copy_if_present(defaults, data, "split_strategy")
+    _copy_if_present(defaults, data, "split_stratify_attribute")
     _copy_if_present(defaults, data, "train_basin_count")
     _copy_if_present(defaults, data, "val_basin_count")
     _copy_if_present(defaults, data, "test_basin_count")

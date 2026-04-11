@@ -74,6 +74,8 @@ _SUMMARY_PREFERRED_FIELDS = [
     "patience",
     "min_delta",
     "seed",
+    "split_strategy",
+    "split_stratify_attribute",
     "train_basin_count",
     "val_basin_count",
     "test_basin_count",
@@ -118,6 +120,8 @@ def _base_train_args(config_path: str) -> Dict[str, Any]:
         "patience": defaults.get("patience", 10),
         "min_delta": defaults.get("min_delta", 0.0),
         "seed": defaults.get("seed", 42),
+        "split_strategy": defaults.get("split_strategy", "random"),
+        "split_stratify_attribute": defaults.get("split_stratify_attribute", "aridity"),
         "device": defaults.get("device", "auto"),
         "num_workers": defaults.get("num_workers", 0),
         "limit_basins": defaults.get("limit_basins"),
@@ -273,6 +277,23 @@ def _read_metrics(path: Path) -> Dict[str, Any]:
     }
 
 
+def _run_config_matches(config_path: Path, train_args: Mapping[str, Any]) -> bool:
+    if not config_path.exists():
+        return False
+    try:
+        saved_config = json.loads(config_path.read_text())
+    except json.JSONDecodeError:
+        return False
+
+    ignored_keys = {"checkpoint", "output_dir"}
+    for key, value in train_args.items():
+        if key in ignored_keys:
+            continue
+        if saved_config.get(key) != value:
+            return False
+    return True
+
+
 def _write_summary(rows: List[Dict[str, Any]], output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     row_fields = {field for row in rows for field in row}
@@ -357,12 +378,14 @@ def run_sweep(args: Namespace) -> None:
 
         completion_path = metrics_path if options["evaluate"] else history_path
         if options["skip_existing"] and completion_path.exists():
-            print(f"Skipping existing run: {run_name}")
-            row.update(_read_metrics(metrics_path))
-            row["status"] = "skipped_existing"
-            rows.append(row)
-            _write_summary(rows, summary_path)
-            continue
+            if _run_config_matches(run_dir / "run_config.json", train_args_dict):
+                print(f"Skipping existing run: {run_name}")
+                row.update(_read_metrics(metrics_path))
+                row["status"] = "skipped_existing"
+                rows.append(row)
+                _write_summary(rows, summary_path)
+                continue
+            print(f"Existing run differs from current config; rerunning: {run_name}")
 
         run_dir.mkdir(parents=True, exist_ok=True)
         train_args = Namespace(**train_args_dict)

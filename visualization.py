@@ -744,11 +744,24 @@ def create_split_data_analysis_plots(
     target_variable = defaults.get("target_variable", "qobs")
     static_attributes = defaults.get("static_attributes")
     seed = defaults.get("seed", 42)
+    split_strategy = defaults.get("split_strategy", "random").lower()
+    split_stratify_attribute = defaults.get("split_stratify_attribute", "aridity")
 
     client = MiniCamels(local_data_dir=data_dir or defaults.get("data_dir"))
     basins = client.basins().copy()
     basins["basin_id"] = basins["basin_id"].map(_normalize_basin_id)
     basin_ids = basins["basin_id"].tolist()
+    attrs = client.attributes().copy()
+    attrs.index = attrs.index.map(_normalize_basin_id)
+
+    stratify_values = None
+    if split_strategy == "stratified":
+        if split_stratify_attribute not in attrs.columns:
+            raise ValueError(
+                f"split_stratify_attribute={split_stratify_attribute!r} is not in "
+                "the MiniCAMELS attributes table."
+            )
+        stratify_values = attrs[split_stratify_attribute].to_dict()
 
     splits = make_basin_splits(
         basin_ids,
@@ -756,6 +769,8 @@ def create_split_data_analysis_plots(
         val_count=defaults.get("val_basin_count"),
         test_count=defaults.get("test_basin_count"),
         seed=seed,
+        split_strategy=split_strategy,
+        stratify_values=stratify_values,
     )
     split_names = ["train", "val", "test"]
     split_colors = {"train": "tab:blue", "val": "tab:green", "test": "tab:red"}
@@ -771,14 +786,20 @@ def create_split_data_analysis_plots(
     split_df = pd.DataFrame(
         [{"basin_id": basin_id, "split": split_name} for split_name, ids in splits.items() for basin_id in ids]
     )
+    if split_strategy == "stratified" and split_stratify_attribute in attrs.columns:
+        split_df[split_stratify_attribute] = split_df["basin_id"].map(attrs[split_stratify_attribute])
     split_df.to_csv(root / "split_assignments.csv", index=False)
 
     ts_df = _load_split_timeseries(client, splits, dynamic_inputs, target_variable)
-    attrs = client.attributes().copy()
-    attrs.index = attrs.index.map(_normalize_basin_id)
     attrs = attrs.reset_index().rename(columns={"index": "basin_id"})
     attrs["basin_id"] = attrs["basin_id"].map(_normalize_basin_id)
     attrs["split"] = attrs["basin_id"].map(_split_lookup(splits))
+    if split_stratify_attribute in attrs.columns:
+        (
+            attrs.groupby("split")[split_stratify_attribute]
+            .agg(["count", "min", "max", "mean", "std"])
+            .to_csv(root / f"{split_stratify_attribute}_split_summary.csv")
+        )
 
     _plot_distribution_by_split(ts_df, target_variable, distribution_dir / "qobs_distribution_by_split.png")
     _plot_distribution_by_split(ts_df, target_variable, distribution_dir / "log_qobs_distribution_by_split.png", log_transform=True)

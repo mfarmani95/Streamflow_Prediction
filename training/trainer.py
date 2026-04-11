@@ -117,6 +117,8 @@ def train_model(args: Namespace) -> None:
         target_variable=args.target_variable,
         static_attributes=args.static_attributes,
         seed=args.seed,
+        split_strategy=args.split_strategy,
+        split_stratify_attribute=args.split_stratify_attribute,
         limit_basins=args.limit_basins,
         train_basin_count=args.train_basin_count,
         val_basin_count=args.val_basin_count,

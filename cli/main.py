@@ -74,6 +74,8 @@ def build_parser(train_defaults: Optional[dict] = None) -> argparse.ArgumentPars
     train.add_argument("--dynamic-inputs", nargs="+", default=_default(train_defaults, "dynamic_inputs", list(DEFAULT_DYNAMIC_INPUTS)))
     train.add_argument("--target-variable", default=_default(train_defaults, "target_variable", DEFAULT_TARGET_VARIABLE))
     train.add_argument("--static-attributes", nargs="+", default=_default(train_defaults, "static_attributes", list(DEFAULT_STATIC_ATTRIBUTES)))
+    train.add_argument("--split-strategy", choices=["random", "stratified"], default=_default(train_defaults, "split_strategy", "random"))
+    train.add_argument("--split-stratify-attribute", default=_default(train_defaults, "split_stratify_attribute", "aridity"))
     train.add_argument("--epochs", type=int, default=_default(train_defaults, "epochs", 20))
     train.add_argument("--batch-size", type=int, default=_default(train_defaults, "batch_size", 64))
     train.add_argument("--lr", type=float, default=_default(train_defaults, "lr", 1e-3))

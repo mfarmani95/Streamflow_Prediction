@@ -6,6 +6,7 @@ from training.losses import (
     KGELoss,
     MaskedMAELoss,
     MaskedMSELoss,
+    NSELoss,
     build_loss,
     nse_loss,
 )
@@ -17,6 +18,7 @@ __all__ = [
     "KGELoss",
     "MaskedMAELoss",
     "MaskedMSELoss",
+    "NSELoss",
     "build_loss",
     "nse_loss",
     "train_model",

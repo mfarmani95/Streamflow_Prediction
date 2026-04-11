@@ -97,14 +97,15 @@ def make_basin_splits(
     val_count: Optional[int] = None,
     test_count: Optional[int] = None,
     seed: int = 42,
+    split_strategy: str = "random",
+    stratify_values: Optional[Mapping[str, float]] = None,
 ) -> Dict[str, List[str]]:
     """Split basin IDs into train/validation/test groups without leakage."""
     basin_ids = [_normalize_basin_id(value) for value in basin_ids]
     rng = np.random.default_rng(seed)
-    shuffled = np.array(basin_ids, dtype=object)
-    rng.shuffle(shuffled)
+    split_strategy = split_strategy.lower()
 
-    n_basins = len(shuffled)
+    n_basins = len(basin_ids)
     if train_count is not None or val_count is not None or test_count is not None:
         n_train = train_count if train_count is not None else max(1, int(n_basins * train_fraction))
         n_val = val_count if val_count is not None else max(1, int(n_basins * val_fraction))
@@ -123,10 +124,60 @@ def make_basin_splits(
             n_val = max(0, n_basins - n_train - 1)
         n_test = n_basins - n_train - n_val
 
+    counts = {"train": n_train, "val": n_val, "test": n_test}
+    n_selected = sum(counts.values())
+    if split_strategy == "random":
+        shuffled = np.array(basin_ids, dtype=object)
+        rng.shuffle(shuffled)
+        return {
+            "train": shuffled[:n_train].tolist(),
+            "val": shuffled[n_train : n_train + n_val].tolist(),
+            "test": shuffled[n_train + n_val : n_train + n_val + n_test].tolist(),
+        }
+
+    if split_strategy != "stratified":
+        raise ValueError(
+            f"Unsupported split_strategy={split_strategy!r}. Use 'random' or 'stratified'."
+        )
+    if stratify_values is None:
+        raise ValueError("stratify_values must be provided when split_strategy='stratified'.")
+
+    value_by_basin = {
+        _normalize_basin_id(basin_id): float(value)
+        for basin_id, value in stratify_values.items()
+        if value is not None and np.isfinite(float(value))
+    }
+    finite_values = [value_by_basin[basin_id] for basin_id in basin_ids if basin_id in value_by_basin]
+    if not finite_values:
+        raise ValueError("No finite stratification values were found for basin splitting.")
+
+    min_value = float(np.min(finite_values))
+    max_value = float(np.max(finite_values))
+    ranked = []
+    for basin_id in basin_ids:
+        stratify_value = value_by_basin.get(basin_id)
+        if stratify_value is None:
+            stratify_value = float(rng.uniform(min_value, max_value))
+        ranked.append((stratify_value, float(rng.random()), basin_id))
+    ranked.sort(key=lambda item: (item[0], item[1]))
+    if n_selected < len(ranked):
+        selected_indices = rng.choice(len(ranked), size=n_selected, replace=False)
+        ranked = sorted([ranked[int(index)] for index in selected_indices], key=lambda item: (item[0], item[1]))
+    else:
+        ranked = ranked[:n_selected]
+
+    label_positions = []
+    for split_name, count in counts.items():
+        for index in range(count):
+            label_positions.append(((index + 0.5) / count, float(rng.random()), split_name))
+    label_positions.sort(key=lambda item: (item[0], item[1]))
+
+    splits = {"train": [], "val": [], "test": []}
+    for (_, _, basin_id), (_, _, split_name) in zip(ranked, label_positions):
+        splits[split_name].append(basin_id)
     return {
-        "train": shuffled[:n_train].tolist(),
-        "val": shuffled[n_train : n_train + n_val].tolist(),
-        "test": shuffled[n_train + n_val : n_train + n_val + n_test].tolist(),
+        split_name: basin_ids
+        for split_name, basin_ids in splits.items()
     }
 
 
@@ -195,9 +246,10 @@ def summarize_dataset(data_dir: Optional[str] = None) -> Dict[str, Any]:
         "target_variable": DEFAULT_TARGET_VARIABLE,
         "static_attributes_used_by_default": list(DEFAULT_STATIC_ATTRIBUTES),
         "split_strategy": (
-            "Basin split: 70% train, 15% validation, 15% test. The validation "
-            "and test basins are never used for fitting model weights or "
-            "normalization statistics, which avoids spatial leakage."
+            "Basin split: train/validation/test are separated by basin to avoid "
+            "spatial leakage. The YAML config can use stratified splitting, "
+            "for example by aridity, so validation and test basins better cover "
+            "the same climate range as training basins."
         ),
         "supervised_sample": (
             "Input is a sequence of daily forcings plus static catchment "
@@ -237,6 +289,8 @@ def build_datasets(
     split_ids: Optional[Mapping[str, Sequence[str]]] = None,
     scalers: Optional[Mapping[str, Sequence[float]]] = None,
     seed: int = 42,
+    split_strategy: str = "random",
+    split_stratify_attribute: str = "aridity",
     limit_basins: Optional[int] = None,
     train_basin_count: Optional[int] = None,
     val_basin_count: Optional[int] = None,
@@ -255,14 +309,25 @@ def build_datasets(
     attributes_df = client.attributes().copy()
     attributes_df.index = attributes_df.index.map(_normalize_basin_id)
     static_cols = _choose_static_attributes(attributes_df, static_attributes)
+    split_strategy = split_strategy.lower()
 
     if split_ids is None:
+        stratify_values = None
+        if split_strategy == "stratified":
+            if split_stratify_attribute not in attributes_df.columns:
+                raise ValueError(
+                    f"split_stratify_attribute={split_stratify_attribute!r} is not in "
+                    f"the MiniCAMELS attributes table."
+                )
+            stratify_values = attributes_df[split_stratify_attribute].to_dict()
         splits = make_basin_splits(
             basin_ids,
             train_count=train_basin_count,
             val_count=val_basin_count,
             test_count=test_basin_count,
             seed=seed,
+            split_strategy=split_strategy,
+            stratify_values=stratify_values,
         )
     else:
         splits = {
@@ -365,6 +430,8 @@ def build_datasets(
         "target_variable": target_variable,
         "static_attributes": static_cols,
         "splits": splits,
+        "split_strategy": split_strategy,
+        "split_stratify_attribute": split_stratify_attribute if split_strategy == "stratified" else None,
         "scalers": dict(scalers),
         "sample_counts": {name: len(samples) for name, samples in sample_index.items()},
         "basin_counts": {name: len(ids) for name, ids in splits.items()},
@@ -384,6 +451,8 @@ def build_dataloaders(
     split_ids: Optional[Mapping[str, Sequence[str]]] = None,
     scalers: Optional[Mapping[str, Sequence[float]]] = None,
     seed: int = 42,
+    split_strategy: str = "random",
+    split_stratify_attribute: str = "aridity",
     limit_basins: Optional[int] = None,
     train_basin_count: Optional[int] = None,
     val_basin_count: Optional[int] = None,
@@ -405,6 +474,8 @@ def build_dataloaders(
         split_ids=split_ids,
         scalers=scalers,
         seed=seed,
+        split_strategy=split_strategy,
+        split_stratify_attribute=split_stratify_attribute,
         limit_basins=limit_basins,
         train_basin_count=train_basin_count,
         val_basin_count=val_basin_count,

@@ -23,6 +23,8 @@ data:
     - soil_depth_pelletier
     - frac_forest
     - lai_max
+  split_strategy: stratified
+  split_stratify_attribute: aridity
   train_basin_count: 30
   val_basin_count: 10
   test_basin_count: 10

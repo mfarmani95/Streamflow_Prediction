@@ -94,8 +94,15 @@ outputs/sweeps` to create combined training-history figures under
 for the variables that changed across the sweep runs.
 
 The default YAML uses a fixed basin split of 30 training basins, 10 validation
-basins, and 10 test basins. The split is shuffled deterministically with
-`seed: 42`, then reused across all sweep runs.
+basins, and 10 test basins. The split is stratified by `aridity` with
+`seed: 42`, so validation and test basins better cover the same aridity range
+as training basins while still avoiding basin leakage. You can switch back to a
+plain random basin split with:
+
+```yaml
+data:
+  split_strategy: random
+```
 
 The split-aware exploratory plots are written to `outputs/data_analysis/`.
 They include streamflow and forcing distributions, static attribute plots such
@@ -105,11 +112,12 @@ example hydrographs.
 
 ## Current Implementation Notes
 
-The default data split is by basin: 70% train, 15% validation, and 15% test.
-Normalization statistics are fitted only from the training basins, then reused
-for validation and test. The default static attributes are physical/climate
-catchment descriptors and exclude discharge-derived signatures such as
-`q_mean`, `runoff_ratio`, `hfd_mean`, and `baseflow_index` to avoid leakage.
+The default data split is by basin: 30 training basins, 10 validation basins,
+and 10 test basins, stratified by aridity. Normalization statistics are fitted
+only from the training basins, then reused for validation and test. The default
+static attributes are physical/climate catchment descriptors and exclude
+discharge-derived signatures such as `q_mean`, `runoff_ratio`, `hfd_mean`, and
+`baseflow_index` to avoid leakage.
 
 MiniCAMELS is installed directly from GitHub because it is not published on
 PyPI:
