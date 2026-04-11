@@ -68,6 +68,8 @@ The sweep command defaults to the assignment experiment grid:
 `seq_lens=[30, 60, 90, 120, 360]`, `hidden_sizes=[32, 64, 128, 256]`,
 `batch_sizes=[26, 32, 64, 128]`, `loss=kge`, and `lr=0.001`. Each run is saved
 under `outputs/sweeps/` with its own checkpoint, history, metrics, and plots.
+Sweep runs use non-overlapping windows by setting the stride equal to each
+sequence length.
 
 The default YAML uses a fixed basin split of 30 training basins, 10 validation
 basins, and 10 test basins. The split is shuffled deterministically with

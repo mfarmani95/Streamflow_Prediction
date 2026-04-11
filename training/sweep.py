@@ -18,6 +18,7 @@ def _base_train_args(config_path: str) -> Dict[str, Any]:
         "model": defaults.get("model", "lstm"),
         "seq_len": defaults.get("seq_len", 30),
         "forecast_horizon": defaults.get("forecast_horizon", 1),
+        "window_stride": defaults.get("window_stride"),
         "dynamic_inputs": defaults.get(
             "dynamic_inputs",
             ["prcp", "tmax", "tmin", "srad", "vp"],
@@ -131,7 +132,8 @@ def run_sweep(args: Namespace) -> None:
                     print(
                         "DRY RUN | "
                         f"{run_name}: seq_len={seq_len}, hidden_size={hidden_size}, "
-                        f"batch_size={batch_size}, output_dir={run_dir}"
+                        f"batch_size={batch_size}, loss={args.loss}, lr={args.lr}, "
+                        f"window_stride={seq_len}, output_dir={run_dir}"
                     )
                     row["status"] = "dry_run"
                     rows.append(row)
@@ -150,6 +152,7 @@ def run_sweep(args: Namespace) -> None:
                     **{
                         **base,
                         "seq_len": seq_len,
+                        "window_stride": seq_len,
                         "hidden_size": hidden_size,
                         "batch_size": batch_size,
                         "loss": args.loss,

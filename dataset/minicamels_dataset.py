@@ -135,9 +135,13 @@ def _build_sample_index(
     basin_ids: Iterable[str],
     seq_len: int,
     forecast_horizon: int,
+    window_stride: Optional[int] = None,
 ) -> List[Tuple[str, int]]:
     samples: List[Tuple[str, int]] = []
     kernel = np.ones(seq_len, dtype=np.int32)
+    stride = window_stride or seq_len
+    if stride <= 0:
+        raise ValueError("window_stride must be positive.")
 
     for basin_id in basin_ids:
         basin = basin_data[basin_id]
@@ -150,7 +154,7 @@ def _build_sample_index(
         window_valid = np.convolve(dynamic_valid, kernel, mode="valid") == seq_len
         target_valid = np.isfinite(basin.target)
 
-        for start in range(max_start):
+        for start in range(0, max_start, stride):
             target_index = start + seq_len + forecast_horizon - 1
             if window_valid[start] and target_valid[target_index]:
                 samples.append((basin_id, start))
@@ -226,6 +230,7 @@ def build_datasets(
     data_dir: Optional[str] = None,
     seq_len: int = 30,
     forecast_horizon: int = 1,
+    window_stride: Optional[int] = None,
     dynamic_inputs: Sequence[str] = DEFAULT_DYNAMIC_INPUTS,
     target_variable: str = DEFAULT_TARGET_VARIABLE,
     static_attributes: Optional[Sequence[str]] = None,
@@ -331,7 +336,13 @@ def build_datasets(
     from dataset.sequence_dataset import StreamflowSequenceDataset
 
     sample_index = {
-        name: _build_sample_index(basin_data, ids, seq_len, forecast_horizon)
+        name: _build_sample_index(
+            basin_data,
+            ids,
+            seq_len,
+            forecast_horizon,
+            window_stride=window_stride,
+        )
         for name, ids in splits.items()
     }
     datasets = {
@@ -349,6 +360,7 @@ def build_datasets(
         "data_dir": data_dir,
         "seq_len": seq_len,
         "forecast_horizon": forecast_horizon,
+        "window_stride": window_stride or seq_len,
         "dynamic_inputs": list(dynamic_inputs),
         "target_variable": target_variable,
         "static_attributes": static_cols,
@@ -364,6 +376,7 @@ def build_dataloaders(
     data_dir: Optional[str] = None,
     seq_len: int = 30,
     forecast_horizon: int = 1,
+    window_stride: Optional[int] = None,
     batch_size: int = 64,
     dynamic_inputs: Sequence[str] = DEFAULT_DYNAMIC_INPUTS,
     target_variable: str = DEFAULT_TARGET_VARIABLE,
@@ -385,6 +398,7 @@ def build_dataloaders(
         data_dir=data_dir,
         seq_len=seq_len,
         forecast_horizon=forecast_horizon,
+        window_stride=window_stride,
         dynamic_inputs=dynamic_inputs,
         target_variable=target_variable,
         static_attributes=static_attributes,

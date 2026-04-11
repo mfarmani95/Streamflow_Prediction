@@ -1,6 +1,8 @@
 data:
   seq_len: 360
   forecast_horizon: 1
+  # null means use non-overlapping windows with stride equal to seq_len.
+  window_stride:
   dynamic_inputs:
     - prcp
     - tmax

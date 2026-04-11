@@ -14,7 +14,7 @@ from dataset.minicamels_dataset import build_dataloaders
 from model import build_model
 from training.early_stopper import EarlyStopper
 from training.losses import build_loss
-from util.metrics import nse
+from util.metrics import kge, nse
 
 
 def _resolve_device(name: str = "auto") -> torch.device:
@@ -61,7 +61,7 @@ def _run_validation(
     criterion: torch.nn.Module,
     device: torch.device,
     metadata: Dict[str, Any],
-) -> Tuple[float, float]:
+) -> Tuple[float, float, float]:
     model.eval()
     loss_sum = 0.0
     n_samples = 0
@@ -80,13 +80,13 @@ def _run_validation(
             targets.append(target.detach().cpu().numpy())
 
     if n_samples == 0:
-        return float("nan"), float("nan")
+        return float("nan"), float("nan"), float("nan")
 
     pred_norm = np.concatenate(predictions)
     target_norm = np.concatenate(targets)
     pred = _target_to_original(pred_norm, metadata)
     obs = _target_to_original(target_norm, metadata)
-    return loss_sum / n_samples, nse(obs, pred)
+    return loss_sum / n_samples, nse(obs, pred), kge(obs, pred)
 
 
 def _write_history_csv(history: Dict[str, list], output_path: Path) -> None:
@@ -111,6 +111,7 @@ def train_model(args: Namespace) -> None:
         data_dir=args.data_dir,
         seq_len=args.seq_len,
         forecast_horizon=args.forecast_horizon,
+        window_stride=args.window_stride,
         batch_size=args.batch_size,
         dynamic_inputs=args.dynamic_inputs,
         target_variable=args.target_variable,
@@ -130,7 +131,7 @@ def train_model(args: Namespace) -> None:
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     stopper = EarlyStopper(patience=args.patience, min_delta=args.min_delta)
 
-    history = {"train_loss": [], "val_loss": [], "val_nse": []}
+    history = {"train_loss": [], "val_loss": [], "val_nse": [], "val_kge": []}
     checkpoint_path = Path(args.checkpoint)
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
     best_val_loss = float("inf")
@@ -159,7 +160,7 @@ def train_model(args: Namespace) -> None:
             train_samples += batch_size
 
         train_loss = train_loss_sum / max(1, train_samples)
-        val_loss, val_nse = _run_validation(
+        val_loss, val_nse, val_kge = _run_validation(
             model,
             loaders["val"],
             criterion,
@@ -169,10 +170,12 @@ def train_model(args: Namespace) -> None:
         history["train_loss"].append(train_loss)
         history["val_loss"].append(val_loss)
         history["val_nse"].append(val_nse)
+        history["val_kge"].append(val_kge)
 
         print(
             f"Epoch {epoch:03d}/{args.epochs} | "
-            f"train_loss={train_loss:.5f} | val_loss={val_loss:.5f} | val_nse={val_nse:.3f}"
+            f"train_loss={train_loss:.5f} | val_loss={val_loss:.5f} | "
+            f"val_nse={val_nse:.3f} | val_kge={val_kge:.3f}"
         )
 
         if val_loss < best_val_loss:

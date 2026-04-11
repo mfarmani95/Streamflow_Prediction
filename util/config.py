@@ -29,6 +29,7 @@ DEFAULT_STATIC_ATTRIBUTES: Tuple[str, ...] = (
 class DataConfig:
     seq_len: int = 30
     forecast_horizon: int = 1
+    window_stride: Optional[int] = None
     dynamic_inputs: Tuple[str, ...] = DEFAULT_DYNAMIC_INPUTS
     target_variable: str = DEFAULT_TARGET_VARIABLE
     static_attributes: Tuple[str, ...] = DEFAULT_STATIC_ATTRIBUTES
@@ -91,6 +92,7 @@ def train_defaults_from_config(config: Mapping[str, Any]) -> Dict[str, Any]:
 
     _copy_if_present(defaults, data, "seq_len")
     _copy_if_present(defaults, data, "forecast_horizon")
+    _copy_if_present(defaults, data, "window_stride")
     _copy_if_present(defaults, data, "dynamic_inputs")
     _copy_if_present(defaults, data, "target_variable")
     _copy_if_present(defaults, data, "static_attributes")

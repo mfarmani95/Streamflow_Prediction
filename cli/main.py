@@ -62,6 +62,7 @@ def build_parser(train_defaults: Optional[dict] = None) -> argparse.ArgumentPars
     train.add_argument("--model", choices=["lstm", "transformer"], default=_default(train_defaults, "model", "lstm"))
     train.add_argument("--seq-len", type=int, default=_default(train_defaults, "seq_len", 30))
     train.add_argument("--forecast-horizon", type=int, default=_default(train_defaults, "forecast_horizon", 1))
+    train.add_argument("--window-stride", type=int, default=_default(train_defaults, "window_stride", None))
     train.add_argument("--dynamic-inputs", nargs="+", default=_default(train_defaults, "dynamic_inputs", list(DEFAULT_DYNAMIC_INPUTS)))
     train.add_argument("--target-variable", default=_default(train_defaults, "target_variable", DEFAULT_TARGET_VARIABLE))
     train.add_argument("--static-attributes", nargs="+", default=_default(train_defaults, "static_attributes", list(DEFAULT_STATIC_ATTRIBUTES)))
