@@ -57,6 +57,14 @@ def build_parser(train_defaults: Optional[dict] = None) -> argparse.ArgumentPars
     summarize.add_argument("--make-plots", action="store_true", help="Create exploratory plots.")
     summarize.add_argument("--output-dir", default="outputs", help="Directory for figures.")
 
+    analyze = subparsers.add_parser(
+        "analyze-data",
+        help="Create split-aware exploratory plots from a YAML config.",
+    )
+    analyze.add_argument("--config", default="configs/default.yaml")
+    analyze.add_argument("--data-dir", default=None)
+    analyze.add_argument("--output-dir", default="outputs/data_analysis")
+
     train = subparsers.add_parser("train", help="Train a streamflow sequence model.")
     train.add_argument("--config", default=_default(train_defaults, "config", None))
     train.add_argument("--model", choices=["lstm", "transformer"], default=_default(train_defaults, "model", "lstm"))
@@ -144,6 +152,14 @@ def main(argv: Optional[list[str]] = None) -> None:
                 data_dir=args.data_dir,
                 output_dir=f"{args.output_dir}/exploratory",
             )
+    elif args.command == "analyze-data":
+        from visualization import create_split_data_analysis_plots
+
+        create_split_data_analysis_plots(
+            config_path=args.config,
+            output_dir=args.output_dir,
+            data_dir=args.data_dir,
+        )
     elif args.command == "train":
         from training.trainer import train_model
 

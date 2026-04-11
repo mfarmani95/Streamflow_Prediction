@@ -46,6 +46,7 @@ print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "No GPU")
 ```bash
 python3 main.py summarize-data
 python3 main.py summarize-data --make-plots
+python3 main.py analyze-data --config configs/default.yaml
 python3 main.py train --config configs/default.yaml
 python3 main.py train --model lstm --seq-len 30 --epochs 20 --loss mse --device auto
 python3 main.py sweep --config configs/default.yaml --dry-run
@@ -74,6 +75,12 @@ sequence length.
 The default YAML uses a fixed basin split of 30 training basins, 10 validation
 basins, and 10 test basins. The split is shuffled deterministically with
 `seed: 42`, then reused across all sweep runs.
+
+The split-aware exploratory plots are written to `outputs/data_analysis/`.
+They include streamflow and forcing distributions, static attribute plots such
+as aridity and q_mean, basin locations by split, missing-value diagnostics,
+correlation heatmaps, non-overlapping sequence target distributions, and
+example hydrographs.
 
 ## Current Implementation Notes
 
