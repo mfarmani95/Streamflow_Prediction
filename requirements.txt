@@ -1,9 +1,12 @@
+aiohttp
+fsspec
 matplotlib
 git+https://github.com/BennettHydroLab/minicamels.git
 netCDF4
 numpy
 pandas
 PyYAML
+requests
 scikit-learn
 torch
 tqdm
