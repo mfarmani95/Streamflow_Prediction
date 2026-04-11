@@ -1,7 +1,6 @@
 # Streamflow Prediction with Sequence Models
 
-This project implements HWRS640 Assignment 4 using a package layout similar to
-your Noah/soil-solver style projects.
+This project implements HWRS640 Assignment 4.
 
 ## Structure
 
@@ -47,9 +46,16 @@ print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "No GPU")
 ```bash
 python3 main.py summarize-data
 python3 main.py summarize-data --make-plots
+python3 main.py train --config configs/default.yaml
 python3 main.py train --model lstm --seq-len 30 --epochs 20 --loss mse --device auto
 python3 main.py evaluate --checkpoint outputs/best_model.pt
 python3 main.py plot --checkpoint outputs/best_model.pt
+```
+
+When using `--config`, command-line flags override YAML values. For example:
+
+```bash
+python3 main.py train --config configs/default.yaml --epochs 2 --limit-basins 10
 ```
 
 The default loss is masked MSE, available as `--loss mse` or

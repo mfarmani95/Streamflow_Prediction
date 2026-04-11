@@ -3,6 +3,7 @@ git+https://github.com/BennettHydroLab/minicamels.git
 netCDF4
 numpy
 pandas
+PyYAML
 scikit-learn
 torch
 tqdm

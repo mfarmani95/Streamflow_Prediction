@@ -3,12 +3,48 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pprint import pprint
+from typing import Optional
 
 from dataset.minicamels_dataset import summarize_dataset
+from util.config import (
+    DEFAULT_DYNAMIC_INPUTS,
+    DEFAULT_STATIC_ATTRIBUTES,
+    DEFAULT_TARGET_VARIABLE,
+    load_yaml_config,
+    train_defaults_from_config,
+)
 
 
-def build_parser() -> argparse.ArgumentParser:
+def _default(defaults: dict, key: str, fallback):
+    return defaults.get(key, fallback)
+
+
+def _extract_train_config_path(argv: list[str]) -> Optional[str]:
+    if not argv or argv[0] != "train":
+        return None
+
+    for index, value in enumerate(argv):
+        if value == "--config" and index + 1 < len(argv):
+            return argv[index + 1]
+        if value.startswith("--config="):
+            return value.split("=", 1)[1]
+    return None
+
+
+def _train_defaults_from_argv(argv: list[str]) -> dict:
+    config_path = _extract_train_config_path(argv)
+    if config_path is None:
+        return {}
+
+    defaults = train_defaults_from_config(load_yaml_config(config_path))
+    defaults["config"] = config_path
+    return defaults
+
+
+def build_parser(train_defaults: Optional[dict] = None) -> argparse.ArgumentParser:
+    train_defaults = train_defaults or {}
     parser = argparse.ArgumentParser(
         description="Streamflow prediction with sequence models on MiniCAMELS."
     )
@@ -22,33 +58,37 @@ def build_parser() -> argparse.ArgumentParser:
     summarize.add_argument("--output-dir", default="outputs", help="Directory for figures.")
 
     train = subparsers.add_parser("train", help="Train a streamflow sequence model.")
-    train.add_argument("--model", choices=["lstm", "transformer"], default="lstm")
-    train.add_argument("--seq-len", type=int, default=30)
-    train.add_argument("--forecast-horizon", type=int, default=1)
-    train.add_argument("--epochs", type=int, default=20)
-    train.add_argument("--batch-size", type=int, default=64)
-    train.add_argument("--lr", type=float, default=1e-3)
-    train.add_argument("--hidden-size", type=int, default=64)
-    train.add_argument("--num-layers", type=int, default=1)
-    train.add_argument("--nhead", type=int, default=4)
-    train.add_argument("--dim-feedforward", type=int, default=128)
-    train.add_argument("--dropout", type=float, default=0.0)
+    train.add_argument("--config", default=_default(train_defaults, "config", None))
+    train.add_argument("--model", choices=["lstm", "transformer"], default=_default(train_defaults, "model", "lstm"))
+    train.add_argument("--seq-len", type=int, default=_default(train_defaults, "seq_len", 30))
+    train.add_argument("--forecast-horizon", type=int, default=_default(train_defaults, "forecast_horizon", 1))
+    train.add_argument("--dynamic-inputs", nargs="+", default=_default(train_defaults, "dynamic_inputs", list(DEFAULT_DYNAMIC_INPUTS)))
+    train.add_argument("--target-variable", default=_default(train_defaults, "target_variable", DEFAULT_TARGET_VARIABLE))
+    train.add_argument("--static-attributes", nargs="+", default=_default(train_defaults, "static_attributes", list(DEFAULT_STATIC_ATTRIBUTES)))
+    train.add_argument("--epochs", type=int, default=_default(train_defaults, "epochs", 20))
+    train.add_argument("--batch-size", type=int, default=_default(train_defaults, "batch_size", 64))
+    train.add_argument("--lr", type=float, default=_default(train_defaults, "lr", 1e-3))
+    train.add_argument("--hidden-size", type=int, default=_default(train_defaults, "hidden_size", 64))
+    train.add_argument("--num-layers", type=int, default=_default(train_defaults, "num_layers", 1))
+    train.add_argument("--nhead", type=int, default=_default(train_defaults, "nhead", 4))
+    train.add_argument("--dim-feedforward", type=int, default=_default(train_defaults, "dim_feedforward", 128))
+    train.add_argument("--dropout", type=float, default=_default(train_defaults, "dropout", 0.0))
     train.add_argument(
         "--loss",
         choices=["mse", "masked_mse", "mae", "masked_mae", "kge"],
-        default="mse",
+        default=_default(train_defaults, "loss", "mse"),
     )
-    train.add_argument("--weight-decay", type=float, default=0.0)
-    train.add_argument("--grad-clip", type=float, default=1.0)
-    train.add_argument("--patience", type=int, default=10)
-    train.add_argument("--min-delta", type=float, default=0.0)
-    train.add_argument("--seed", type=int, default=42)
-    train.add_argument("--device", default="auto")
-    train.add_argument("--num-workers", type=int, default=0)
-    train.add_argument("--limit-basins", type=int, default=None)
-    train.add_argument("--data-dir", default=None)
-    train.add_argument("--output-dir", default="outputs")
-    train.add_argument("--checkpoint", default="outputs/best_model.pt")
+    train.add_argument("--weight-decay", type=float, default=_default(train_defaults, "weight_decay", 0.0))
+    train.add_argument("--grad-clip", type=float, default=_default(train_defaults, "grad_clip", 1.0))
+    train.add_argument("--patience", type=int, default=_default(train_defaults, "patience", 10))
+    train.add_argument("--min-delta", type=float, default=_default(train_defaults, "min_delta", 0.0))
+    train.add_argument("--seed", type=int, default=_default(train_defaults, "seed", 42))
+    train.add_argument("--device", default=_default(train_defaults, "device", "auto"))
+    train.add_argument("--num-workers", type=int, default=_default(train_defaults, "num_workers", 0))
+    train.add_argument("--limit-basins", type=int, default=_default(train_defaults, "limit_basins", None))
+    train.add_argument("--data-dir", default=_default(train_defaults, "data_dir", None))
+    train.add_argument("--output-dir", default=_default(train_defaults, "output_dir", "outputs"))
+    train.add_argument("--checkpoint", default=_default(train_defaults, "checkpoint", "outputs/best_model.pt"))
 
     evaluate = subparsers.add_parser("evaluate", help="Evaluate a trained model.")
     evaluate.add_argument("--checkpoint", required=True)
@@ -66,9 +106,10 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> None:
-    parser = build_parser()
-    args = parser.parse_args()
+def main(argv: Optional[list[str]] = None) -> None:
+    argv = sys.argv[1:] if argv is None else argv
+    parser = build_parser(train_defaults=_train_defaults_from_argv(argv))
+    args = parser.parse_args(argv)
 
     if args.command == "summarize-data":
         pprint(summarize_dataset(data_dir=args.data_dir))
