@@ -8,6 +8,19 @@ data:
     - srad
     - vp
   target_variable: qobs
+  static_attributes:
+    - lat
+    - lon
+    - elev_mean
+    - slope_mean
+    - area_km2
+    - mean_prcp
+    - mean_pet
+    - aridity
+    - frac_snow
+    - soil_depth_pelletier
+    - frac_forest
+    - lai_max
 
 model:
   name: lstm

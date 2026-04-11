@@ -8,6 +8,20 @@ from typing import Tuple
 
 DEFAULT_DYNAMIC_INPUTS: Tuple[str, ...] = ("prcp", "tmax", "tmin", "srad", "vp")
 DEFAULT_TARGET_VARIABLE = "qobs"
+DEFAULT_STATIC_ATTRIBUTES: Tuple[str, ...] = (
+    "lat",
+    "lon",
+    "elev_mean",
+    "slope_mean",
+    "area_km2",
+    "mean_prcp",
+    "mean_pet",
+    "aridity",
+    "frac_snow",
+    "soil_depth_pelletier",
+    "frac_forest",
+    "lai_max",
+)
 
 
 @dataclass
@@ -16,6 +30,7 @@ class DataConfig:
     forecast_horizon: int = 1
     dynamic_inputs: Tuple[str, ...] = DEFAULT_DYNAMIC_INPUTS
     target_variable: str = DEFAULT_TARGET_VARIABLE
+    static_attributes: Tuple[str, ...] = DEFAULT_STATIC_ATTRIBUTES
     train_fraction: float = 0.7
     val_fraction: float = 0.15
     test_fraction: float = 0.15

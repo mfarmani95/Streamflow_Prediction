@@ -1,7 +1,9 @@
 matplotlib
-minicamels
+git+https://github.com/BennettHydroLab/minicamels.git
+netCDF4
 numpy
 pandas
 scikit-learn
 torch
 tqdm
+xarray

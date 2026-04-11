@@ -30,18 +30,39 @@ source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 ```
 
+## Google Colab
+
+```python
+!git clone https://github.com/mfarmani95/Streamflow_Prediction.git
+%cd Streamflow_Prediction
+!pip install -r requirements.txt
+
+import torch
+print(torch.cuda.is_available())
+print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "No GPU")
+```
+
 ## CLI
 
 ```bash
 python3 main.py summarize-data
-python3 main.py train --model lstm --seq-len 30 --epochs 20
+python3 main.py summarize-data --make-plots
+python3 main.py train --model lstm --seq-len 30 --epochs 20 --device auto
 python3 main.py evaluate --checkpoint outputs/best_model.pt
 python3 main.py plot --checkpoint outputs/best_model.pt
 ```
 
 ## Current Implementation Notes
 
-The repository structure, model classes, metrics, losses, early stopper, and
-plotting helpers are scaffolded. The next step is to connect `dataset/` to the
-actual `minicamels.MiniCamels` API, then implement the full trainer and
-evaluation workflow on top of those dataloaders.
+The default data split is by basin: 70% train, 15% validation, and 15% test.
+Normalization statistics are fitted only from the training basins, then reused
+for validation and test. The default static attributes are physical/climate
+catchment descriptors and exclude discharge-derived signatures such as
+`q_mean`, `runoff_ratio`, `hfd_mean`, and `baseflow_index` to avoid leakage.
+
+MiniCAMELS is installed directly from GitHub because it is not published on
+PyPI:
+
+```bash
+python3 -m pip install git+https://github.com/BennettHydroLab/minicamels.git
+```
