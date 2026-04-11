@@ -51,6 +51,7 @@ python3 main.py train --config configs/default.yaml
 python3 main.py train --model lstm --seq-len 30 --epochs 20 --loss mse --device auto
 python3 main.py sweep --config configs/default.yaml --dry-run
 python3 main.py sweep --config configs/default.yaml --skip-existing
+python3 main.py sweep-plots --sweep-root outputs/sweeps
 python3 main.py evaluate --checkpoint outputs/best_model.pt
 python3 main.py plot --checkpoint outputs/best_model.pt
 ```
@@ -71,6 +72,13 @@ The sweep command defaults to the assignment experiment grid:
 under `outputs/sweeps/` with its own checkpoint, history, metrics, and plots.
 Sweep runs use non-overlapping windows by setting the stride equal to each
 sequence length.
+
+After the sweep finishes, use `python3 main.py sweep-plots --sweep-root
+outputs/sweeps` to create combined training-history figures under
+`outputs/sweeps/comparison_plots/`. These compare one hyperparameter at a time:
+batch size for fixed sequence length and hidden size, hidden size for fixed
+sequence length and batch size, and sequence length for fixed hidden size and
+batch size.
 
 The default YAML uses a fixed basin split of 30 training basins, 10 validation
 basins, and 10 test basins. The split is shuffled deterministically with

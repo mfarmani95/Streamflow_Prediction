@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import json
+import re
 from argparse import Namespace
 from pathlib import Path
-from typing import Dict, List, Mapping, Sequence
+from typing import Any, Dict, List, Mapping, Sequence
 
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
 
@@ -39,6 +42,253 @@ def plot_training_history(history: Mapping[str, Sequence[float]], output_path: s
     fig.tight_layout()
     fig.savefig(path, dpi=200)
     plt.close(fig)
+
+
+_SWEEP_RUN_PATTERN = re.compile(
+    r"seq(?P<seq_len>\d+)_hidden(?P<hidden_size>\d+)_batch(?P<batch_size>\d+)"
+)
+_SWEEP_PARAM_LABELS = {
+    "seq_len": "sequence length",
+    "hidden_size": "hidden size",
+    "batch_size": "batch size",
+}
+_SWEEP_PARAM_TOKENS = {
+    "seq_len": "seq",
+    "hidden_size": "hidden",
+    "batch_size": "batch",
+}
+_SWEEP_EFFECTS = {
+    "batch_size": {
+        "fixed": ("seq_len", "hidden_size"),
+        "subdir": "batch_size_effect",
+    },
+    "hidden_size": {
+        "fixed": ("seq_len", "batch_size"),
+        "subdir": "hidden_size_effect",
+    },
+    "seq_len": {
+        "fixed": ("hidden_size", "batch_size"),
+        "subdir": "seq_len_effect",
+    },
+}
+
+
+def _coerce_int(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _read_sweep_run_params(run_dir: Path) -> Dict[str, int] | None:
+    params: Dict[str, int | None] = {"seq_len": None, "hidden_size": None, "batch_size": None}
+    config_path = run_dir / "run_config.json"
+    if config_path.exists():
+        try:
+            config = json.loads(config_path.read_text())
+        except json.JSONDecodeError:
+            config = {}
+        for param_name in params:
+            params[param_name] = _coerce_int(config.get(param_name))
+
+    match = _SWEEP_RUN_PATTERN.search(run_dir.name)
+    if match is not None:
+        for param_name, value in match.groupdict().items():
+            params[param_name] = params[param_name] or _coerce_int(value)
+
+    if any(value is None for value in params.values()):
+        return None
+    return {key: int(value) for key, value in params.items() if value is not None}
+
+
+def _read_sweep_histories(sweep_root: Path) -> List[Dict[str, Any]]:
+    runs: List[Dict[str, Any]] = []
+    for history_path in sorted(sweep_root.glob("*/training_history.csv")):
+        run_dir = history_path.parent
+        params = _read_sweep_run_params(run_dir)
+        if params is None:
+            continue
+
+        history = pd.read_csv(history_path)
+        if history.empty:
+            continue
+        if "epoch" not in history.columns:
+            history.insert(0, "epoch", np.arange(1, len(history) + 1))
+
+        for column in ("epoch", "train_loss", "val_loss", "val_nse", "val_kge"):
+            if column in history.columns:
+                history[column] = pd.to_numeric(history[column], errors="coerce")
+
+        runs.append(
+            {
+                **params,
+                "run_name": run_dir.name,
+                "run_dir": run_dir,
+                "history": history,
+            }
+        )
+    return runs
+
+
+def _sweep_param_token(param_name: str, value: int) -> str:
+    token = _SWEEP_PARAM_TOKENS[param_name]
+    return f"{token}{value:03d}"
+
+
+def _sweep_fixed_label(fixed_values: Mapping[str, int]) -> str:
+    return ", ".join(
+        f"{_SWEEP_PARAM_LABELS[param_name]}={value}"
+        for param_name, value in fixed_values.items()
+    )
+
+
+def _sweep_group_filename(varied_param: str, fixed_values: Mapping[str, int]) -> str:
+    fixed_part = "_".join(
+        _sweep_param_token(param_name, value)
+        for param_name, value in fixed_values.items()
+    )
+    return f"{fixed_part}_{varied_param}_effect.png"
+
+
+def _plot_sweep_history_group(
+    runs: Sequence[Mapping[str, Any]],
+    varied_param: str,
+    fixed_values: Mapping[str, int],
+    output_path: Path,
+) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    sorted_runs = sorted(runs, key=lambda run: (run[varied_param], run["run_name"]))
+    cmap = plt.get_cmap("tab10" if len(sorted_runs) <= 10 else "tab20")
+    colors = [cmap(index % cmap.N) for index in range(len(sorted_runs))]
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharex=False)
+    loss_ax, metric_ax = axes
+    color_handles = []
+    varied_label = _SWEEP_PARAM_LABELS[varied_param]
+
+    for color, run in zip(colors, sorted_runs):
+        history = run["history"]
+        epochs = history["epoch"].to_numpy(dtype=float)
+        scenario_label = f"{varied_label}={run[varied_param]}"
+        color_handles.append(Line2D([0], [0], color=color, linewidth=2.5, label=scenario_label))
+
+        if "train_loss" in history.columns:
+            loss_ax.plot(
+                epochs,
+                history["train_loss"].to_numpy(dtype=float),
+                color=color,
+                linestyle="-",
+                linewidth=1.8,
+            )
+        if "val_loss" in history.columns:
+            loss_ax.plot(
+                epochs,
+                history["val_loss"].to_numpy(dtype=float),
+                color=color,
+                linestyle="--",
+                linewidth=1.8,
+            )
+        if "val_nse" in history.columns:
+            metric_ax.plot(
+                epochs,
+                history["val_nse"].to_numpy(dtype=float),
+                color=color,
+                linestyle="-",
+                linewidth=1.8,
+            )
+        if "val_kge" in history.columns:
+            metric_ax.plot(
+                epochs,
+                history["val_kge"].to_numpy(dtype=float),
+                color=color,
+                linestyle="--",
+                linewidth=1.8,
+            )
+
+    fixed_label = _sweep_fixed_label(fixed_values)
+    loss_ax.set_title("Loss (solid=train, dashed=val)")
+    loss_ax.set_xlabel("Epoch")
+    loss_ax.set_ylabel("Loss")
+    loss_ax.grid(alpha=0.25)
+
+    metric_ax.set_title("Validation metrics (solid=NSE, dashed=KGE)")
+    metric_ax.set_xlabel("Epoch")
+    metric_ax.set_ylabel("Validation metric")
+    metric_ax.grid(alpha=0.25)
+
+    fig.suptitle(f"Effect of {varied_label} with {fixed_label}")
+    style_handles = [
+        Line2D([0], [0], color="black", linewidth=2, linestyle="-", label="solid: train loss / val NSE"),
+        Line2D([0], [0], color="black", linewidth=2, linestyle="--", label="dashed: val loss / val KGE"),
+    ]
+    legend_handles = [*color_handles, *style_handles]
+    fig.legend(
+        handles=legend_handles,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.02),
+        ncol=min(7, max(1, len(legend_handles))),
+        frameon=False,
+        columnspacing=1.2,
+        handlelength=2.8,
+    )
+    fig.tight_layout(rect=(0, 0.14, 1, 0.92))
+    fig.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+
+def create_sweep_comparison_plots(
+    sweep_root: str = "outputs/sweeps",
+    output_dir: str | None = None,
+    effects: Sequence[str] | None = None,
+) -> None:
+    """Create grouped comparison plots from completed sweep training histories."""
+    root = Path(sweep_root)
+    if not root.exists():
+        raise FileNotFoundError(f"{root} does not exist. Run the sweep first.")
+
+    runs = _read_sweep_histories(root)
+    if not runs:
+        raise FileNotFoundError(
+            f"No training_history.csv files were found under {root}. Run the sweep first."
+        )
+
+    selected_effects = list(effects or _SWEEP_EFFECTS.keys())
+    invalid_effects = sorted(set(selected_effects) - set(_SWEEP_EFFECTS))
+    if invalid_effects:
+        raise ValueError(f"Unsupported sweep effects: {invalid_effects}")
+
+    plot_root = Path(output_dir) if output_dir else root / "comparison_plots"
+    plot_count = 0
+    for varied_param in selected_effects:
+        spec = _SWEEP_EFFECTS[varied_param]
+        fixed_params = spec["fixed"]
+        grouped_runs: Dict[tuple[int, ...], List[Dict[str, Any]]] = {}
+        for run in runs:
+            fixed_key = tuple(int(run[param_name]) for param_name in fixed_params)
+            grouped_runs.setdefault(fixed_key, []).append(run)
+
+        for fixed_key, group_runs in sorted(grouped_runs.items()):
+            varied_values = {int(run[varied_param]) for run in group_runs}
+            if len(varied_values) < 2:
+                continue
+            fixed_values = {
+                param_name: value for param_name, value in zip(fixed_params, fixed_key)
+            }
+            output_path = (
+                plot_root
+                / spec["subdir"]
+                / _sweep_group_filename(varied_param, fixed_values)
+            )
+            _plot_sweep_history_group(group_runs, varied_param, fixed_values, output_path)
+            plot_count += 1
+
+    if plot_count == 0:
+        print(f"No comparable sweep groups found in {root}.")
+        return
+
+    print(f"Sweep comparison plots written to {plot_root} ({plot_count} figures).")
 
 
 def plot_predicted_observed(dates, observed, predicted, output_path: str) -> None:
@@ -182,20 +432,20 @@ def _plot_distribution_by_split(
         split_name: _values_for_distribution(df, column, split_name, log_transform)
         for split_name in split_order
     }
-    all_values = np.concatenate(
-        [values for values in values_by_split.values() if values.size > 0]
-    )
-    if all_values.size == 0:
+    non_empty_values = [values for values in values_by_split.values() if values.size > 0]
+    if not non_empty_values:
         return
+    all_values = np.concatenate(non_empty_values)
 
     x_label = f"log1p({column})" if log_transform else column
     bins = np.histogram_bin_edges(all_values, bins=60)
-    colors = {"train": "tab:blue", "val": "tab:green", "test": "tab:red"}
+    colors = {"train": "#0072B2", "val": "#009E73", "test": "#D55E00"}
 
-    fig = plt.figure(figsize=(10, 7))
-    grid = fig.add_gridspec(2, 3, height_ratios=[2.2, 1.4])
+    fig = plt.figure(figsize=(12, 7.5))
+    grid = fig.add_gridspec(2, 3, height_ratios=[2.1, 1.5])
     hist_axes = [fig.add_subplot(grid[0, idx]) for idx in range(3)]
-    ecdf_ax = fig.add_subplot(grid[1, :])
+    overlay_ax = fig.add_subplot(grid[1, :2])
+    ecdf_ax = fig.add_subplot(grid[1, 2])
 
     max_density = 0.0
     for values in values_by_split.values():
@@ -205,7 +455,15 @@ def _plot_distribution_by_split(
 
     for ax, split_name in zip(hist_axes, split_order):
         values = values_by_split[split_name]
-        ax.hist(values, bins=bins, density=True, color=colors[split_name], alpha=0.8)
+        ax.hist(
+            values,
+            bins=bins,
+            density=True,
+            color=colors[split_name],
+            alpha=0.25,
+            edgecolor=colors[split_name],
+            linewidth=0.8,
+        )
         ax.set_title(f"{split_name} (n={values.size:,})")
         ax.set_xlabel(x_label)
         ax.set_ylabel("Density")
@@ -221,9 +479,31 @@ def _plot_distribution_by_split(
     for split_name, values in values_by_split.items():
         if values.size == 0:
             continue
+        overlay_ax.hist(
+            values,
+            bins=bins,
+            density=True,
+            histtype="step",
+            linewidth=2.0,
+            color=colors[split_name],
+            label=split_name,
+        )
         sorted_values = np.sort(values)
         y = np.arange(1, len(sorted_values) + 1) / len(sorted_values)
-        ecdf_ax.plot(sorted_values, y, label=split_name, color=colors[split_name], linewidth=1.8)
+        ecdf_ax.plot(
+            sorted_values,
+            y,
+            label=split_name,
+            color=colors[split_name],
+            linewidth=1.8,
+        )
+    overlay_ax.set_title("Density overlay")
+    overlay_ax.set_xlabel(x_label)
+    overlay_ax.set_ylabel("Density")
+    overlay_ax.set_xlim(float(np.nanmin(all_values)), float(np.nanmax(all_values)))
+    overlay_ax.legend()
+
+    ecdf_ax.set_title("ECDF")
     ecdf_ax.set_xlabel(x_label)
     ecdf_ax.set_ylabel("ECDF")
     ecdf_ax.set_xlim(float(np.nanmin(all_values)), float(np.nanmax(all_values)))
@@ -273,6 +553,7 @@ def _plot_sequence_target_distributions(
     seq_lens: Sequence[int],
     output_path: Path,
 ) -> None:
+    colors = {"train": "#0072B2", "val": "#009E73", "test": "#D55E00"}
     fig, axes = plt.subplots(len(seq_lens), 1, figsize=(8, max(3, 2.4 * len(seq_lens))), sharex=False)
     axes = np.asarray(axes).reshape(-1)
     for ax, seq_len in zip(axes, seq_lens):
@@ -284,7 +565,15 @@ def _plot_sequence_target_distributions(
                 targets.append(values[target_indices])
             target_values = np.concatenate(targets) if targets else np.array([])
             target_values = target_values[np.isfinite(target_values)]
-            ax.hist(target_values, bins=50, alpha=0.45, density=True, label=split_name)
+            ax.hist(
+                target_values,
+                bins=50,
+                density=True,
+                histtype="step",
+                linewidth=1.8,
+                color=colors.get(split_name),
+                label=split_name,
+            )
         ax.set_title(f"Non-overlapping sequence targets, seq_len={seq_len}")
         ax.set_xlabel(target_variable)
         ax.set_ylabel("Density")

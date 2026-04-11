@@ -135,6 +135,20 @@ def build_parser(train_defaults: Optional[dict] = None) -> argparse.ArgumentPars
     sweep.add_argument("--no-evaluate", dest="evaluate", action="store_false")
     sweep.set_defaults(evaluate=True)
 
+    sweep_plots = subparsers.add_parser(
+        "sweep-plots",
+        help="Create grouped training-history comparison plots from sweep outputs.",
+    )
+    sweep_plots.add_argument("--sweep-root", default="outputs/sweeps")
+    sweep_plots.add_argument("--output-dir", default=None)
+    sweep_plots.add_argument(
+        "--effects",
+        nargs="+",
+        choices=["seq_len", "hidden_size", "batch_size"],
+        default=["seq_len", "hidden_size", "batch_size"],
+        help="Which hyperparameter effects to plot.",
+    )
+
     return parser
 
 
@@ -176,5 +190,13 @@ def main(argv: Optional[list[str]] = None) -> None:
         from training.sweep import run_sweep
 
         run_sweep(args)
+    elif args.command == "sweep-plots":
+        from visualization import create_sweep_comparison_plots
+
+        create_sweep_comparison_plots(
+            sweep_root=args.sweep_root,
+            output_dir=args.output_dir,
+            effects=args.effects,
+        )
     else:
         parser.error(f"Unknown command: {args.command}")
