@@ -163,17 +163,72 @@ def _load_split_timeseries(client, splits: Mapping[str, Sequence[str]], dynamic_
     return pd.concat(frames, ignore_index=True)
 
 
-def _plot_hist_by_split(df: pd.DataFrame, column: str, output_path: Path, log_transform: bool = False) -> None:
-    fig, ax = plt.subplots(figsize=(8, 4))
-    for split_name, group in df.groupby("split"):
-        values = group[column].to_numpy(dtype=float)
-        values = values[np.isfinite(values)]
-        if log_transform:
-            values = np.log1p(values[values >= 0])
-        ax.hist(values, bins=60, alpha=0.45, density=True, label=split_name)
-    ax.set_xlabel(f"log1p({column})" if log_transform else column)
-    ax.set_ylabel("Density")
-    ax.legend()
+def _values_for_distribution(df: pd.DataFrame, column: str, split_name: str, log_transform: bool) -> np.ndarray:
+    values = df.loc[df["split"] == split_name, column].to_numpy(dtype=float)
+    values = values[np.isfinite(values)]
+    if log_transform:
+        values = np.log1p(values[values >= 0])
+    return values
+
+
+def _plot_distribution_by_split(
+    df: pd.DataFrame,
+    column: str,
+    output_path: Path,
+    log_transform: bool = False,
+    split_order: Sequence[str] = ("train", "val", "test"),
+) -> None:
+    values_by_split = {
+        split_name: _values_for_distribution(df, column, split_name, log_transform)
+        for split_name in split_order
+    }
+    all_values = np.concatenate(
+        [values for values in values_by_split.values() if values.size > 0]
+    )
+    if all_values.size == 0:
+        return
+
+    x_label = f"log1p({column})" if log_transform else column
+    bins = np.histogram_bin_edges(all_values, bins=60)
+    colors = {"train": "tab:blue", "val": "tab:green", "test": "tab:red"}
+
+    fig = plt.figure(figsize=(10, 7))
+    grid = fig.add_gridspec(2, 3, height_ratios=[2.2, 1.4])
+    hist_axes = [fig.add_subplot(grid[0, idx]) for idx in range(3)]
+    ecdf_ax = fig.add_subplot(grid[1, :])
+
+    max_density = 0.0
+    for values in values_by_split.values():
+        if values.size > 0:
+            density, _ = np.histogram(values, bins=bins, density=True)
+            max_density = max(max_density, float(np.nanmax(density)))
+
+    for ax, split_name in zip(hist_axes, split_order):
+        values = values_by_split[split_name]
+        ax.hist(values, bins=bins, density=True, color=colors[split_name], alpha=0.8)
+        ax.set_title(f"{split_name} (n={values.size:,})")
+        ax.set_xlabel(x_label)
+        ax.set_ylabel("Density")
+        ax.set_xlim(float(np.nanmin(all_values)), float(np.nanmax(all_values)))
+        if max_density > 0:
+            ax.set_ylim(0, max_density * 1.08)
+
+        if values.size > 0:
+            median = float(np.nanmedian(values))
+            ax.axvline(median, color="black", linestyle="--", linewidth=1, label="median")
+            ax.legend(loc="upper right", fontsize=8)
+
+    for split_name, values in values_by_split.items():
+        if values.size == 0:
+            continue
+        sorted_values = np.sort(values)
+        y = np.arange(1, len(sorted_values) + 1) / len(sorted_values)
+        ecdf_ax.plot(sorted_values, y, label=split_name, color=colors[split_name], linewidth=1.8)
+    ecdf_ax.set_xlabel(x_label)
+    ecdf_ax.set_ylabel("ECDF")
+    ecdf_ax.set_xlim(float(np.nanmin(all_values)), float(np.nanmax(all_values)))
+    ecdf_ax.legend()
+    fig.suptitle(f"{column} distribution by split")
     fig.tight_layout()
     fig.savefig(output_path, dpi=200)
     plt.close(fig)
@@ -292,10 +347,10 @@ def create_split_data_analysis_plots(
     attrs["basin_id"] = attrs["basin_id"].map(_normalize_basin_id)
     attrs["split"] = attrs["basin_id"].map(_split_lookup(splits))
 
-    _plot_hist_by_split(ts_df, target_variable, distribution_dir / "qobs_distribution_by_split.png")
-    _plot_hist_by_split(ts_df, target_variable, distribution_dir / "log_qobs_distribution_by_split.png", log_transform=True)
+    _plot_distribution_by_split(ts_df, target_variable, distribution_dir / "qobs_distribution_by_split.png")
+    _plot_distribution_by_split(ts_df, target_variable, distribution_dir / "log_qobs_distribution_by_split.png", log_transform=True)
     for variable in dynamic_inputs:
-        _plot_hist_by_split(ts_df, variable, distribution_dir / f"{variable}_distribution_by_split.png")
+        _plot_distribution_by_split(ts_df, variable, distribution_dir / f"{variable}_distribution_by_split.png")
     _plot_boxplot(ts_df, [*dynamic_inputs, target_variable], "split", distribution_dir / "dynamic_inputs_qobs_boxplots_by_split.png", "Dynamic Inputs and Streamflow by Split")
 
     selected_static = static_attributes or [
