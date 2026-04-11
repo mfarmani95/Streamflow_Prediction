@@ -64,7 +64,9 @@ python3 main.py train --config configs/default.yaml --epochs 2 --limit-basins 10
 
 The default loss is masked MSE, available as `--loss mse` or
 `--loss masked_mse`. You can also use `--loss mae`, `--loss masked_mae`, or
-`--loss kge`.
+`--loss kge` / `--loss nse`. The KGE and NSE training losses are minimized as
+`1 - KGE` and `1 - NSE`, while validation and test reports still show the
+actual KGE and NSE metric values.
 
 The sweep grid is controlled from the `sweep` section of the YAML config. The
 default assignment grid is:

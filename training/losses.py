@@ -19,6 +19,33 @@ class BaseLoss(nn.Module):
         """Calculate the loss."""
         raise NotImplementedError
 
+    def _target_scalar(self, name: str) -> Optional[float]:
+        if not isinstance(self.config, dict):
+            return None
+        value = self.config.get(name)
+        if value is None and isinstance(self.config.get("scalers"), dict):
+            value = self.config["scalers"].get(name)
+        if value is None:
+            return None
+        return float(torch.as_tensor(value).reshape(-1)[0])
+
+    def _maybe_original_units(
+        self,
+        predictions: torch.Tensor,
+        targets: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        mean = self._target_scalar("target_mean")
+        std = self._target_scalar("target_std")
+        if mean is None or std is None:
+            return predictions, targets
+
+        mean_tensor = predictions.new_tensor(mean)
+        std_tensor = predictions.new_tensor(std)
+        return (
+            predictions * (std_tensor + 1e-6) + mean_tensor,
+            targets * (std_tensor + 1e-6) + mean_tensor,
+        )
+
 
 class MaskedMSELoss(BaseLoss):
     """Mean squared error loss that ignores NaN values in the target tensor."""
@@ -60,33 +87,6 @@ class KGELoss(BaseLoss):
     def __init__(self, config: Optional[Any] = None) -> None:
         super().__init__(config)
 
-    def _target_scalar(self, name: str) -> Optional[float]:
-        if not isinstance(self.config, dict):
-            return None
-        value = self.config.get(name)
-        if value is None and isinstance(self.config.get("scalers"), dict):
-            value = self.config["scalers"].get(name)
-        if value is None:
-            return None
-        return float(torch.as_tensor(value).reshape(-1)[0])
-
-    def _maybe_original_units(
-        self,
-        predictions: torch.Tensor,
-        targets: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        mean = self._target_scalar("target_mean")
-        std = self._target_scalar("target_std")
-        if mean is None or std is None:
-            return predictions, targets
-
-        mean_tensor = predictions.new_tensor(mean)
-        std_tensor = predictions.new_tensor(std)
-        return (
-            predictions * (std_tensor + 1e-6) + mean_tensor,
-            targets * (std_tensor + 1e-6) + mean_tensor,
-        )
-
     def forward(self, predictions: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         predictions, targets = self._maybe_original_units(predictions, targets)
         mask = ~torch.isnan(targets)
@@ -119,6 +119,31 @@ class KGELoss(BaseLoss):
         return 1.0 - kge
 
 
+class NSELoss(BaseLoss):
+    """Nash-Sutcliffe Efficiency loss.
+
+    NSE is a higher-is-better metric with an ideal value of 1. This loss
+    returns ``1 - NSE`` so minimizing the loss maximizes NSE.
+    """
+
+    def __init__(self, config: Optional[Any] = None) -> None:
+        super().__init__(config)
+
+    def forward(self, predictions: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        predictions, targets = self._maybe_original_units(predictions, targets)
+        mask = ~torch.isnan(targets)
+        predictions = predictions[mask]
+        targets = targets[mask]
+        if targets.numel() == 0:
+            return predictions.sum() * 0.0
+
+        eps = torch.finfo(targets.dtype).eps
+        numerator = torch.sum((targets - predictions) ** 2)
+        denominator = torch.sum((targets - torch.mean(targets)) ** 2)
+        nse = 1.0 - numerator / (denominator + eps)
+        return 1.0 - nse
+
+
 def build_loss(name: str = "mse", config: Optional[Any] = None) -> nn.Module:
     normalized = name.lower()
     if normalized in {"mse", "masked_mse"}:
@@ -127,6 +152,8 @@ def build_loss(name: str = "mse", config: Optional[Any] = None) -> nn.Module:
         return MaskedMAELoss(config)
     if normalized == "kge":
         return KGELoss(config)
+    if normalized == "nse":
+        return NSELoss(config)
     raise ValueError(f"Unsupported loss function: {name}")
 
 
@@ -135,7 +162,7 @@ def nse_loss(
     target: torch.Tensor,
     eps: float = 1e-6,
 ) -> torch.Tensor:
-    """Differentiable Nash-Sutcliffe loss, where lower is better."""
+    """Differentiable ``1 - NSE`` loss, where lower is better."""
     mask = ~torch.isnan(target)
     prediction = prediction[mask]
     target = target[mask]

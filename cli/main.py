@@ -84,7 +84,7 @@ def build_parser(train_defaults: Optional[dict] = None) -> argparse.ArgumentPars
     train.add_argument("--dropout", type=float, default=_default(train_defaults, "dropout", 0.0))
     train.add_argument(
         "--loss",
-        choices=["mse", "masked_mse", "mae", "masked_mae", "kge"],
+        choices=["mse", "masked_mse", "mae", "masked_mae", "kge", "nse"],
         default=_default(train_defaults, "loss", "mse"),
     )
     train.add_argument("--weight-decay", type=float, default=_default(train_defaults, "weight_decay", 0.0))
@@ -120,7 +120,7 @@ def build_parser(train_defaults: Optional[dict] = None) -> argparse.ArgumentPars
     sweep.add_argument("--seq-lens", nargs="+", type=int, default=None)
     sweep.add_argument("--hidden-sizes", nargs="+", type=int, default=None)
     sweep.add_argument("--batch-sizes", nargs="+", type=int, default=None)
-    sweep.add_argument("--loss", choices=["mse", "masked_mse", "mae", "masked_mae", "kge"], default=None)
+    sweep.add_argument("--loss", choices=["mse", "masked_mse", "mae", "masked_mae", "kge", "nse"], default=None)
     sweep.add_argument("--lr", type=float, default=None)
     sweep.add_argument("--output-root", default=None)
     sweep.add_argument("--eval-batch-size", type=int, default=None)
