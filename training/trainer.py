@@ -120,7 +120,7 @@ def train_model(args: Namespace) -> None:
 
     model_kwargs = _model_kwargs(args, metadata)
     model = build_model(args.model, **model_kwargs).to(device)
-    criterion = build_loss(args.loss)
+    criterion = build_loss(args.loss, config={"scalers": metadata["scalers"]})
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     stopper = EarlyStopper(patience=args.patience, min_delta=args.min_delta)
 

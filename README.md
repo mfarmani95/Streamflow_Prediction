@@ -47,10 +47,14 @@ print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "No GPU")
 ```bash
 python3 main.py summarize-data
 python3 main.py summarize-data --make-plots
-python3 main.py train --model lstm --seq-len 30 --epochs 20 --device auto
+python3 main.py train --model lstm --seq-len 30 --epochs 20 --loss mse --device auto
 python3 main.py evaluate --checkpoint outputs/best_model.pt
 python3 main.py plot --checkpoint outputs/best_model.pt
 ```
+
+The default loss is masked MSE, available as `--loss mse` or
+`--loss masked_mse`. You can also use `--loss mae`, `--loss masked_mae`, or
+`--loss kge`.
 
 ## Current Implementation Notes
 

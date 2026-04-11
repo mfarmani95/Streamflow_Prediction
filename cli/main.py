@@ -33,7 +33,11 @@ def build_parser() -> argparse.ArgumentParser:
     train.add_argument("--nhead", type=int, default=4)
     train.add_argument("--dim-feedforward", type=int, default=128)
     train.add_argument("--dropout", type=float, default=0.0)
-    train.add_argument("--loss", choices=["mse", "mae"], default="mse")
+    train.add_argument(
+        "--loss",
+        choices=["mse", "masked_mse", "mae", "masked_mae", "kge"],
+        default="mse",
+    )
     train.add_argument("--weight-decay", type=float, default=0.0)
     train.add_argument("--grad-clip", type=float, default=1.0)
     train.add_argument("--patience", type=int, default=10)
