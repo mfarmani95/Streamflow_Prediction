@@ -21,6 +21,9 @@ data:
     - soil_depth_pelletier
     - frac_forest
     - lai_max
+  train_basin_count: 30
+  val_basin_count: 10
+  test_basin_count: 10
 
 model:
   name: lstm
@@ -31,7 +34,7 @@ model:
 training:
   epochs: 50
   batch_size: 128
-  learning_rate: 0.0005
+  learning_rate: 0.001
   loss: mse
   weight_decay: 0.00001
   grad_clip: 1.0

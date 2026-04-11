@@ -48,6 +48,8 @@ python3 main.py summarize-data
 python3 main.py summarize-data --make-plots
 python3 main.py train --config configs/default.yaml
 python3 main.py train --model lstm --seq-len 30 --epochs 20 --loss mse --device auto
+python3 main.py sweep --config configs/default.yaml --dry-run
+python3 main.py sweep --config configs/default.yaml --skip-existing
 python3 main.py evaluate --checkpoint outputs/best_model.pt
 python3 main.py plot --checkpoint outputs/best_model.pt
 ```
@@ -61,6 +63,15 @@ python3 main.py train --config configs/default.yaml --epochs 2 --limit-basins 10
 The default loss is masked MSE, available as `--loss mse` or
 `--loss masked_mse`. You can also use `--loss mae`, `--loss masked_mae`, or
 `--loss kge`.
+
+The sweep command defaults to the assignment experiment grid:
+`seq_lens=[30, 60, 90, 120, 360]`, `hidden_sizes=[32, 64, 128, 256]`,
+`batch_sizes=[26, 32, 64, 128]`, `loss=kge`, and `lr=0.001`. Each run is saved
+under `outputs/sweeps/` with its own checkpoint, history, metrics, and plots.
+
+The default YAML uses a fixed basin split of 30 training basins, 10 validation
+basins, and 10 test basins. The split is shuffled deterministically with
+`seed: 42`, then reused across all sweep runs.
 
 ## Current Implementation Notes
 

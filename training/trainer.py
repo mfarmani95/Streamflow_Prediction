@@ -117,6 +117,9 @@ def train_model(args: Namespace) -> None:
         static_attributes=args.static_attributes,
         seed=args.seed,
         limit_basins=args.limit_basins,
+        train_basin_count=args.train_basin_count,
+        val_basin_count=args.val_basin_count,
+        test_basin_count=args.test_basin_count,
         num_workers=args.num_workers,
         pin_memory=(device.type == "cuda"),
     )

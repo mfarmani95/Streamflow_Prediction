@@ -93,6 +93,9 @@ def make_basin_splits(
     basin_ids: Sequence[str],
     train_fraction: float = 0.70,
     val_fraction: float = 0.15,
+    train_count: Optional[int] = None,
+    val_count: Optional[int] = None,
+    test_count: Optional[int] = None,
     seed: int = 42,
 ) -> Dict[str, List[str]]:
     """Split basin IDs into train/validation/test groups without leakage."""
@@ -102,15 +105,28 @@ def make_basin_splits(
     rng.shuffle(shuffled)
 
     n_basins = len(shuffled)
-    n_train = max(1, int(n_basins * train_fraction))
-    n_val = max(1, int(n_basins * val_fraction)) if n_basins >= 3 else 0
-    if n_train + n_val >= n_basins and n_basins > 1:
-        n_val = max(0, n_basins - n_train - 1)
+    if train_count is not None or val_count is not None or test_count is not None:
+        n_train = train_count if train_count is not None else max(1, int(n_basins * train_fraction))
+        n_val = val_count if val_count is not None else max(1, int(n_basins * val_fraction))
+        n_test = test_count if test_count is not None else n_basins - n_train - n_val
+        if min(n_train, n_val, n_test) < 0:
+            raise ValueError("Basin split counts must be non-negative.")
+        if n_train + n_val + n_test > n_basins:
+            raise ValueError(
+                "Basin split counts exceed the available basins: "
+                f"train={n_train}, val={n_val}, test={n_test}, available={n_basins}."
+            )
+    else:
+        n_train = max(1, int(n_basins * train_fraction))
+        n_val = max(1, int(n_basins * val_fraction)) if n_basins >= 3 else 0
+        if n_train + n_val >= n_basins and n_basins > 1:
+            n_val = max(0, n_basins - n_train - 1)
+        n_test = n_basins - n_train - n_val
 
     return {
         "train": shuffled[:n_train].tolist(),
         "val": shuffled[n_train : n_train + n_val].tolist(),
-        "test": shuffled[n_train + n_val :].tolist(),
+        "test": shuffled[n_train + n_val : n_train + n_val + n_test].tolist(),
     }
 
 
@@ -217,6 +233,9 @@ def build_datasets(
     scalers: Optional[Mapping[str, Sequence[float]]] = None,
     seed: int = 42,
     limit_basins: Optional[int] = None,
+    train_basin_count: Optional[int] = None,
+    val_basin_count: Optional[int] = None,
+    test_basin_count: Optional[int] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Create train/validation/test ``Dataset`` objects and metadata."""
     MiniCamels = _require_minicamels()
@@ -233,7 +252,13 @@ def build_datasets(
     static_cols = _choose_static_attributes(attributes_df, static_attributes)
 
     if split_ids is None:
-        splits = make_basin_splits(basin_ids, seed=seed)
+        splits = make_basin_splits(
+            basin_ids,
+            train_count=train_basin_count,
+            val_count=val_basin_count,
+            test_count=test_basin_count,
+            seed=seed,
+        )
     else:
         splits = {
             name: [_normalize_basin_id(value) for value in values]
@@ -347,6 +372,9 @@ def build_dataloaders(
     scalers: Optional[Mapping[str, Sequence[float]]] = None,
     seed: int = 42,
     limit_basins: Optional[int] = None,
+    train_basin_count: Optional[int] = None,
+    val_basin_count: Optional[int] = None,
+    test_basin_count: Optional[int] = None,
     num_workers: int = 0,
     pin_memory: bool = False,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
@@ -364,6 +392,9 @@ def build_dataloaders(
         scalers=scalers,
         seed=seed,
         limit_basins=limit_basins,
+        train_basin_count=train_basin_count,
+        val_basin_count=val_basin_count,
+        test_basin_count=test_basin_count,
     )
     loaders = {
         name: DataLoader(
