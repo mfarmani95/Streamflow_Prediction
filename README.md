@@ -66,19 +66,30 @@ The default loss is masked MSE, available as `--loss mse` or
 `--loss masked_mse`. You can also use `--loss mae`, `--loss masked_mae`, or
 `--loss kge`.
 
-The sweep command defaults to the assignment experiment grid:
-`seq_lens=[30, 60, 90, 120, 360]`, `hidden_sizes=[32, 64, 128, 256]`,
-`batch_sizes=[26, 32, 64, 128]`, `loss=kge`, and `lr=0.001`. Each run is saved
-under `outputs/sweeps/` with its own checkpoint, history, metrics, and plots.
-Sweep runs use non-overlapping windows by setting the stride equal to each
-sequence length.
+The sweep grid is controlled from the `sweep` section of the YAML config. The
+default assignment grid is:
+
+```yaml
+sweep:
+  output_root: outputs/sweeps
+  loss: kge
+  learning_rate: 0.001
+  grid:
+    seq_len: [30, 60, 90, 120, 360]
+    hidden_size: [32, 64, 128, 256]
+    batch_size: [26, 32, 64, 128]
+```
+
+Any training argument can be swept by adding it to `sweep.grid`, for example
+`learning_rate: [0.0001, 0.0005, 0.001]` or `dropout: [0.0, 0.1, 0.2]`.
+Each run is saved under `outputs/sweeps/` with its own checkpoint, history,
+metrics, and plots. Sweep runs use non-overlapping windows by setting the
+stride equal to each sequence length when `window_stride` is null.
 
 After the sweep finishes, use `python3 main.py sweep-plots --sweep-root
 outputs/sweeps` to create combined training-history figures under
-`outputs/sweeps/comparison_plots/`. These compare one hyperparameter at a time:
-batch size for fixed sequence length and hidden size, hidden size for fixed
-sequence length and batch size, and sequence length for fixed hidden size and
-batch size.
+`outputs/sweeps/comparison_plots/`. These compare one hyperparameter at a time
+for the variables that changed across the sweep runs.
 
 The default YAML uses a fixed basin split of 30 training basins, 10 validation
 basins, and 10 test basins. The split is shuffled deterministically with

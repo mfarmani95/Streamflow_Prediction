@@ -47,3 +47,14 @@ training:
   num_workers: 2
   output_dir: outputs
   checkpoint_path: outputs/best_model.pt
+
+sweep:
+  output_root: outputs/sweeps
+  eval_batch_size: 256
+  evaluate: true
+  loss: kge
+  learning_rate: 0.001
+  grid:
+    seq_len: [30, 60, 90, 120, 360]
+    hidden_size: [32, 64, 128, 256]
+    batch_size: [26, 32, 64, 128]

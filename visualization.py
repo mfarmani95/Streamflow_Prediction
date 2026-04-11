@@ -47,29 +47,78 @@ def plot_training_history(history: Mapping[str, Sequence[float]], output_path: s
 _SWEEP_RUN_PATTERN = re.compile(
     r"seq(?P<seq_len>\d+)_hidden(?P<hidden_size>\d+)_batch(?P<batch_size>\d+)"
 )
+_SWEEP_PARAM_ALIASES = {
+    "batch": "batch_size",
+    "batches": "batch_size",
+    "batch_sizes": "batch_size",
+    "hidden": "hidden_size",
+    "hidden_sizes": "hidden_size",
+    "learning_rate": "lr",
+    "learning_rates": "lr",
+    "lrs": "lr",
+    "sequence_length": "seq_len",
+    "sequence_lengths": "seq_len",
+    "seq": "seq_len",
+    "seq_lens": "seq_len",
+}
 _SWEEP_PARAM_LABELS = {
     "seq_len": "sequence length",
     "hidden_size": "hidden size",
     "batch_size": "batch size",
+    "lr": "learning rate",
+    "loss": "loss",
+    "dropout": "dropout",
+    "num_layers": "number of layers",
+    "weight_decay": "weight decay",
+    "window_stride": "window stride",
+    "forecast_horizon": "forecast horizon",
+    "model": "model",
 }
 _SWEEP_PARAM_TOKENS = {
     "seq_len": "seq",
     "hidden_size": "hidden",
     "batch_size": "batch",
+    "lr": "lr",
+    "loss": "loss",
+    "dropout": "drop",
+    "num_layers": "layers",
+    "weight_decay": "wd",
+    "window_stride": "stride",
+    "forecast_horizon": "horizon",
+    "model": "model",
 }
-_SWEEP_EFFECTS = {
-    "batch_size": {
-        "fixed": ("seq_len", "hidden_size"),
-        "subdir": "batch_size_effect",
-    },
-    "hidden_size": {
-        "fixed": ("seq_len", "batch_size"),
-        "subdir": "hidden_size_effect",
-    },
-    "seq_len": {
-        "fixed": ("hidden_size", "batch_size"),
-        "subdir": "seq_len_effect",
-    },
+_SWEEP_COMPARISON_PARAM_ORDER = [
+    "model",
+    "seq_len",
+    "forecast_horizon",
+    "window_stride",
+    "hidden_size",
+    "num_layers",
+    "nhead",
+    "dim_feedforward",
+    "dropout",
+    "batch_size",
+    "lr",
+    "loss",
+    "weight_decay",
+    "grad_clip",
+    "patience",
+    "min_delta",
+    "seed",
+    "train_basin_count",
+    "val_basin_count",
+    "test_basin_count",
+]
+_SWEEP_NON_COMPARISON_PARAMS = {
+    "checkpoint",
+    "config",
+    "data_dir",
+    "device",
+    "dynamic_inputs",
+    "num_workers",
+    "output_dir",
+    "static_attributes",
+    "target_variable",
 }
 
 
@@ -82,25 +131,28 @@ def _coerce_int(value: object) -> int | None:
         return None
 
 
-def _read_sweep_run_params(run_dir: Path) -> Dict[str, int] | None:
-    params: Dict[str, int | None] = {"seq_len": None, "hidden_size": None, "batch_size": None}
+def _canonical_sweep_param_name(name: str) -> str:
+    normalized = name.strip().replace("-", "_").lower()
+    return _SWEEP_PARAM_ALIASES.get(normalized, normalized)
+
+
+def _read_sweep_run_params(run_dir: Path) -> Dict[str, Any]:
+    params: Dict[str, Any] = {}
     config_path = run_dir / "run_config.json"
     if config_path.exists():
         try:
             config = json.loads(config_path.read_text())
         except json.JSONDecodeError:
             config = {}
-        for param_name in params:
-            params[param_name] = _coerce_int(config.get(param_name))
+        for param_name, value in config.items():
+            params[_canonical_sweep_param_name(param_name)] = value
 
     match = _SWEEP_RUN_PATTERN.search(run_dir.name)
     if match is not None:
         for param_name, value in match.groupdict().items():
-            params[param_name] = params[param_name] or _coerce_int(value)
+            params.setdefault(param_name, _coerce_int(value))
 
-    if any(value is None for value in params.values()):
-        return None
-    return {key: int(value) for key, value in params.items() if value is not None}
+    return params
 
 
 def _read_sweep_histories(sweep_root: Path) -> List[Dict[str, Any]]:
@@ -123,7 +175,7 @@ def _read_sweep_histories(sweep_root: Path) -> List[Dict[str, Any]]:
 
         runs.append(
             {
-                **params,
+                "params": params,
                 "run_name": run_dir.name,
                 "run_dir": run_dir,
                 "history": history,
@@ -132,46 +184,122 @@ def _read_sweep_histories(sweep_root: Path) -> List[Dict[str, Any]]:
     return runs
 
 
-def _sweep_param_token(param_name: str, value: int) -> str:
-    token = _SWEEP_PARAM_TOKENS[param_name]
-    return f"{token}{value:03d}"
+def _sweep_param_label(param_name: str) -> str:
+    return _SWEEP_PARAM_LABELS.get(param_name, param_name.replace("_", " "))
 
 
-def _sweep_fixed_label(fixed_values: Mapping[str, int]) -> str:
+def _sweep_value_key(value: Any) -> str:
+    if isinstance(value, (dict, list, tuple)):
+        return json.dumps(value, sort_keys=True, default=str)
+    return str(value)
+
+
+def _format_sweep_value(value: Any) -> str:
+    if isinstance(value, float):
+        return f"{value:g}"
+    if isinstance(value, (list, tuple)):
+        return "[" + ", ".join(_format_sweep_value(item) for item in value) + "]"
+    return str(value)
+
+
+def _format_sweep_filename_value(value: Any) -> str:
+    text = _format_sweep_value(value)
+    text = text.replace("-", "m").replace(".", "p")
+    text = re.sub(r"[^A-Za-z0-9]+", "-", text).strip("-")
+    return text or "value"
+
+
+def _sweep_param_token(param_name: str, value: Any) -> str:
+    token = _SWEEP_PARAM_TOKENS.get(param_name, param_name)
+    if isinstance(value, int) and param_name in {"seq_len", "hidden_size", "batch_size", "window_stride"}:
+        return f"{token}{value:03d}"
+    return f"{token}{_format_sweep_filename_value(value)}"
+
+
+def _sweep_fixed_label(fixed_values: Mapping[str, Any]) -> str:
+    if not fixed_values:
+        return "all other swept settings fixed"
     return ", ".join(
-        f"{_SWEEP_PARAM_LABELS[param_name]}={value}"
+        f"{_sweep_param_label(param_name)}={_format_sweep_value(value)}"
         for param_name, value in fixed_values.items()
     )
 
 
-def _sweep_group_filename(varied_param: str, fixed_values: Mapping[str, int]) -> str:
-    fixed_part = "_".join(
-        _sweep_param_token(param_name, value)
-        for param_name, value in fixed_values.items()
+def _sweep_group_filename(varied_param: str, fixed_values: Mapping[str, Any]) -> str:
+    fixed_part = (
+        "_".join(
+            _sweep_param_token(param_name, value)
+            for param_name, value in fixed_values.items()
+        )
+        or "all"
     )
     return f"{fixed_part}_{varied_param}_effect.png"
+
+
+def _sweep_sort_value(value: Any) -> tuple[int, Any]:
+    if isinstance(value, (int, float)):
+        return (0, float(value))
+    return (1, _sweep_value_key(value))
+
+
+def _ordered_sweep_params(param_names: Sequence[str]) -> List[str]:
+    order = {name: index for index, name in enumerate(_SWEEP_COMPARISON_PARAM_ORDER)}
+    return sorted(param_names, key=lambda name: (order.get(name, len(order)), name))
+
+
+def _variable_sweep_params(runs: Sequence[Mapping[str, Any]]) -> List[str]:
+    all_params = {
+        param_name
+        for run in runs
+        for param_name in run["params"]
+        if param_name not in _SWEEP_NON_COMPARISON_PARAMS
+    }
+    variable_params = []
+    for param_name in all_params:
+        values = {
+            _sweep_value_key(run["params"][param_name])
+            for run in runs
+            if param_name in run["params"]
+        }
+        if len(values) > 1:
+            variable_params.append(param_name)
+    if {"seq_len", "window_stride"}.issubset(variable_params):
+        stride_matches_seq = all(
+            run["params"].get("window_stride") == run["params"].get("seq_len")
+            for run in runs
+            if "window_stride" in run["params"] and "seq_len" in run["params"]
+        )
+        if stride_matches_seq:
+            variable_params.remove("window_stride")
+    return _ordered_sweep_params(variable_params)
 
 
 def _plot_sweep_history_group(
     runs: Sequence[Mapping[str, Any]],
     varied_param: str,
-    fixed_values: Mapping[str, int],
+    fixed_values: Mapping[str, Any],
     output_path: Path,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    sorted_runs = sorted(runs, key=lambda run: (run[varied_param], run["run_name"]))
+    sorted_runs = sorted(
+        runs,
+        key=lambda run: (
+            _sweep_sort_value(run["params"][varied_param]),
+            run["run_name"],
+        ),
+    )
     cmap = plt.get_cmap("tab10" if len(sorted_runs) <= 10 else "tab20")
     colors = [cmap(index % cmap.N) for index in range(len(sorted_runs))]
 
     fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharex=False)
     loss_ax, metric_ax = axes
     color_handles = []
-    varied_label = _SWEEP_PARAM_LABELS[varied_param]
+    varied_label = _sweep_param_label(varied_param)
 
     for color, run in zip(colors, sorted_runs):
         history = run["history"]
         epochs = history["epoch"].to_numpy(dtype=float)
-        scenario_label = f"{varied_label}={run[varied_param]}"
+        scenario_label = f"{varied_label}={_format_sweep_value(run['params'][varied_param])}"
         color_handles.append(Line2D([0], [0], color=color, linewidth=2.5, label=scenario_label))
 
         if "train_loss" in history.columns:
@@ -254,31 +382,47 @@ def create_sweep_comparison_plots(
             f"No training_history.csv files were found under {root}. Run the sweep first."
         )
 
-    selected_effects = list(effects or _SWEEP_EFFECTS.keys())
-    invalid_effects = sorted(set(selected_effects) - set(_SWEEP_EFFECTS))
+    variable_params = _variable_sweep_params(runs)
+    selected_effects = [
+        _canonical_sweep_param_name(param_name)
+        for param_name in (effects or variable_params)
+    ]
+    invalid_effects = sorted(set(selected_effects) - set(variable_params))
     if invalid_effects:
-        raise ValueError(f"Unsupported sweep effects: {invalid_effects}")
+        raise ValueError(
+            f"These effects were not varied in the available runs: {invalid_effects}. "
+            f"Available effects: {variable_params}"
+        )
 
     plot_root = Path(output_dir) if output_dir else root / "comparison_plots"
     plot_count = 0
     for varied_param in selected_effects:
-        spec = _SWEEP_EFFECTS[varied_param]
-        fixed_params = spec["fixed"]
-        grouped_runs: Dict[tuple[int, ...], List[Dict[str, Any]]] = {}
+        fixed_params = [param_name for param_name in variable_params if param_name != varied_param]
+        grouped_runs: Dict[tuple[str, ...], List[Dict[str, Any]]] = {}
         for run in runs:
-            fixed_key = tuple(int(run[param_name]) for param_name in fixed_params)
+            if varied_param not in run["params"]:
+                continue
+            fixed_key = tuple(
+                _sweep_value_key(run["params"].get(param_name))
+                for param_name in fixed_params
+            )
             grouped_runs.setdefault(fixed_key, []).append(run)
 
         for fixed_key, group_runs in sorted(grouped_runs.items()):
-            varied_values = {int(run[varied_param]) for run in group_runs}
+            varied_values = {
+                _sweep_value_key(run["params"][varied_param])
+                for run in group_runs
+            }
             if len(varied_values) < 2:
                 continue
+            first_run_params = group_runs[0]["params"]
             fixed_values = {
-                param_name: value for param_name, value in zip(fixed_params, fixed_key)
+                param_name: first_run_params.get(param_name)
+                for param_name in fixed_params
             }
             output_path = (
                 plot_root
-                / spec["subdir"]
+                / f"{varied_param}_effect"
                 / _sweep_group_filename(varied_param, fixed_values)
             )
             _plot_sweep_history_group(group_runs, varied_param, fixed_values, output_path)

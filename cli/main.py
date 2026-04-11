@@ -117,23 +117,23 @@ def build_parser(train_defaults: Optional[dict] = None) -> argparse.ArgumentPars
 
     sweep = subparsers.add_parser("sweep", help="Run a hyperparameter sweep.")
     sweep.add_argument("--config", default="configs/default.yaml")
-    sweep.add_argument("--seq-lens", nargs="+", type=int, default=[30, 60, 90, 120, 360])
-    sweep.add_argument("--hidden-sizes", nargs="+", type=int, default=[32, 64, 128, 256])
-    sweep.add_argument("--batch-sizes", nargs="+", type=int, default=[26, 32, 64, 128])
-    sweep.add_argument("--loss", choices=["mse", "masked_mse", "mae", "masked_mae", "kge"], default="kge")
-    sweep.add_argument("--lr", type=float, default=1e-3)
-    sweep.add_argument("--output-root", default="outputs/sweeps")
-    sweep.add_argument("--eval-batch-size", type=int, default=256)
+    sweep.add_argument("--seq-lens", nargs="+", type=int, default=None)
+    sweep.add_argument("--hidden-sizes", nargs="+", type=int, default=None)
+    sweep.add_argument("--batch-sizes", nargs="+", type=int, default=None)
+    sweep.add_argument("--loss", choices=["mse", "masked_mse", "mae", "masked_mae", "kge"], default=None)
+    sweep.add_argument("--lr", type=float, default=None)
+    sweep.add_argument("--output-root", default=None)
+    sweep.add_argument("--eval-batch-size", type=int, default=None)
     sweep.add_argument("--device", default=None)
     sweep.add_argument("--num-workers", type=int, default=None)
     sweep.add_argument("--limit-basins", type=int, default=None)
     sweep.add_argument("--train-basin-count", type=int, default=None)
     sweep.add_argument("--val-basin-count", type=int, default=None)
     sweep.add_argument("--test-basin-count", type=int, default=None)
-    sweep.add_argument("--dry-run", action="store_true")
-    sweep.add_argument("--skip-existing", action="store_true")
+    sweep.add_argument("--dry-run", action="store_true", default=None)
+    sweep.add_argument("--skip-existing", action="store_true", default=None)
+    sweep.add_argument("--evaluate", dest="evaluate", action="store_true", default=None)
     sweep.add_argument("--no-evaluate", dest="evaluate", action="store_false")
-    sweep.set_defaults(evaluate=True)
 
     sweep_plots = subparsers.add_parser(
         "sweep-plots",
@@ -144,9 +144,8 @@ def build_parser(train_defaults: Optional[dict] = None) -> argparse.ArgumentPars
     sweep_plots.add_argument(
         "--effects",
         nargs="+",
-        choices=["seq_len", "hidden_size", "batch_size"],
-        default=["seq_len", "hidden_size", "batch_size"],
-        help="Which hyperparameter effects to plot.",
+        default=None,
+        help="Which hyperparameter effects to plot, such as seq_len hidden_size batch_size lr.",
     )
 
     return parser
