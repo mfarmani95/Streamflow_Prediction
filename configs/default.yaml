@@ -51,12 +51,15 @@ training:
   checkpoint_path: outputs/best_model.pt
 
 sweep:
-  output_root: outputs/sweeps
+  output_root: outputs/sweeps_mse/
   eval_batch_size: 256
   evaluate: true
-  loss: kge
+  loss: nse
   learning_rate: 0.001
   grid:
-    seq_len: [30, 60, 90, 120, 360]
+    seq_len: [30, 60, 90, 120]
     hidden_size: [32, 64, 128, 256]
-    batch_size: [26, 32, 64, 128]
+    batch_size: [32, 64, 128,256]
+    learning_rate: [0.001,0.003,0.0005]
+
+
