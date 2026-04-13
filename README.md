@@ -51,7 +51,9 @@ python3 main.py train --config configs/default.yaml
 python3 main.py train --model lstm --seq-len 30 --epochs 20 --loss mse --device auto
 python3 main.py sweep --config configs/default.yaml --dry-run
 python3 main.py sweep --config configs/default.yaml --skip-existing
+python3 main.py analyze-sweep --sweep-root outputs/sweeps
 python3 main.py sweep-plots --sweep-root outputs/sweeps
+python3 main.py sweep --config configs/transformer_sweep.yaml --skip-existing
 python3 main.py evaluate --checkpoint outputs/best_model.pt
 python3 main.py plot --checkpoint outputs/best_model.pt
 ```
@@ -93,6 +95,16 @@ After the sweep finishes, use `python3 main.py sweep-plots --sweep-root
 outputs/sweeps` to create combined training-history figures under
 `outputs/sweeps/comparison_plots/`. These compare one hyperparameter at a time
 for the variables that changed across the sweep runs.
+
+Use `python3 main.py analyze-sweep --sweep-root outputs/sweeps` to rank runs by
+validation performance, write top-run tables, create parameter-effect summary
+plots, and save `best_model_summary.txt`. By default the best run is selected
+by `best_val_nse`; test NSE/KGE are reported after selection, not used to choose
+the hyperparameters.
+
+`configs/transformer_sweep.yaml` mirrors the LSTM sweep layout but sets
+`model.name: transformer`, so it can be launched with the same `sweep` command
+when you are ready to compare architectures.
 
 The default YAML uses a fixed basin split of 30 training basins, 10 validation
 basins, and 10 test basins. The split is stratified by `aridity` with

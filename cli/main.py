@@ -150,6 +150,21 @@ def build_parser(train_defaults: Optional[dict] = None) -> argparse.ArgumentPars
         help="Which hyperparameter effects to plot, such as seq_len hidden_size batch_size lr.",
     )
 
+    analyze_sweep = subparsers.add_parser(
+        "analyze-sweep",
+        help="Rank sweep runs and summarize validation/test performance.",
+    )
+    analyze_sweep.add_argument("--sweep-root", default="outputs/sweeps")
+    analyze_sweep.add_argument("--output-dir", default=None)
+    analyze_sweep.add_argument(
+        "--selection-metric",
+        default="best_val_nse",
+        help="Metric used to select the best run. Use auto, best_val_nse, best_val_kge, best_val_loss, test_nse, etc.",
+    )
+    analyze_sweep.add_argument("--top-n", type=int, default=15)
+    analyze_sweep.add_argument("--ascending", action="store_true", default=None)
+    analyze_sweep.add_argument("--descending", dest="ascending", action="store_false")
+
     return parser
 
 
@@ -199,5 +214,9 @@ def main(argv: Optional[list[str]] = None) -> None:
             output_dir=args.output_dir,
             effects=args.effects,
         )
+    elif args.command == "analyze-sweep":
+        from evaluation.sweep_analysis import analyze_sweep
+
+        analyze_sweep(args)
     else:
         parser.error(f"Unknown command: {args.command}")

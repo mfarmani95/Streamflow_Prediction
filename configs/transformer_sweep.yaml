@@ -1,0 +1,64 @@
+data:
+  seq_len: 360
+  forecast_horizon: 1
+  window_stride:
+  dynamic_inputs:
+    - prcp
+    - tmax
+    - tmin
+    - srad
+    - vp
+  target_variable: qobs
+  static_attributes:
+    - lat
+    - lon
+    - elev_mean
+    - slope_mean
+    - area_km2
+    - mean_prcp
+    - mean_pet
+    - aridity
+    - frac_snow
+    - soil_depth_pelletier
+    - frac_forest
+    - lai_max
+  split_strategy: stratified
+  split_stratify_attribute: aridity
+  train_basin_count: 30
+  val_basin_count: 10
+  test_basin_count: 10
+
+model:
+  name: transformer
+  hidden_size: 64
+  num_layers: 2
+  nhead: 4
+  dim_feedforward: 128
+  dropout: 0.1
+
+training:
+  epochs: 50
+  batch_size: 128
+  learning_rate: 0.001
+  loss: nse
+  weight_decay: 0.00001
+  grad_clip: 1.0
+  patience: 10
+  min_delta: 0.0
+  seed: 42
+  device: auto
+  num_workers: 2
+  output_dir: outputs
+  checkpoint_path: outputs/best_model.pt
+
+sweep:
+  output_root: outputs/sweeps_transformer_T1
+  eval_batch_size: 256
+  evaluate: true
+  loss: nse
+  learning_rate: 0.001
+  grid:
+    seq_len: [30, 60, 90, 120]
+    hidden_size: [32, 64, 128, 256]
+    batch_size: [32, 64, 128, 256]
+    learning_rate: [0.001, 0.003, 0.0005]
