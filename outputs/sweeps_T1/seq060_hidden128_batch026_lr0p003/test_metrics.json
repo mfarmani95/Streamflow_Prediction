@@ -1,0 +1,13 @@
+{
+  "overall": {
+    "mse": 9.069024878923136,
+    "mae": 1.5427070160536442,
+    "rmse": 3.011482173103991,
+    "nse": -0.07926514939787865,
+    "kge": 0.24442565946195016
+  },
+  "best_basin_by_nse": "13310700",
+  "worst_basin_by_nse": "10258500",
+  "prediction_file": "outputs/sweeps_T1/seq060_hidden128_batch026_lr0p003/test_predictions.csv",
+  "basin_metrics_file": "outputs/sweeps_T1/seq060_hidden128_batch026_lr0p003/test_metrics_by_basin.csv"
+}
