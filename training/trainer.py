@@ -13,7 +13,7 @@ import torch
 from dataset.minicamels_dataset import build_dataloaders
 from model import build_model
 from training.early_stopper import EarlyStopper
-from training.losses import build_loss
+from training.losses import KGELoss, NSELoss, build_loss
 from util.metrics import kge, nse
 
 
@@ -86,7 +86,16 @@ def _run_validation(
     target_norm = np.concatenate(targets)
     pred = _target_to_original(pred_norm, metadata)
     obs = _target_to_original(target_norm, metadata)
-    return loss_sum / n_samples, nse(obs, pred), kge(obs, pred)
+    val_nse = nse(obs, pred)
+    val_kge = kge(obs, pred)
+
+    if isinstance(criterion, NSELoss):
+        val_loss = 1.0 - val_nse
+    elif isinstance(criterion, KGELoss):
+        val_loss = 1.0 - val_kge
+    else:
+        val_loss = loss_sum / n_samples
+    return val_loss, val_nse, val_kge
 
 
 def _write_history_csv(history: Dict[str, list], output_path: Path) -> None:

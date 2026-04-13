@@ -66,7 +66,8 @@ The default loss is masked MSE, available as `--loss mse` or
 `--loss masked_mse`. You can also use `--loss mae`, `--loss masked_mae`, or
 `--loss kge` / `--loss nse`. The KGE and NSE training losses are minimized as
 `1 - KGE` and `1 - NSE`, while validation and test reports still show the
-actual KGE and NSE metric values.
+actual KGE and NSE metric values. For NSE/KGE validation, `val_loss` is computed
+from the full validation set metric, not as an average of per-batch NSE/KGE.
 
 The sweep grid is controlled from the `sweep` section of the YAML config. The
 default assignment grid is:
