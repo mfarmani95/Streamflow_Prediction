@@ -1,0 +1,1 @@
+MiniCAMELS attributes were not available. Install minicamels and/or pass --data-dir to analyze-run if you want aridity, q_mean, snow fraction, catchment area, and other attribute-vs-performance plots.

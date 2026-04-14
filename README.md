@@ -56,6 +56,7 @@ python3 main.py sweep-plots --sweep-root outputs/sweeps
 python3 main.py analyze-run --run-dir outputs/sweeps/seq120_hidden256_batch128_lr0p003
 python3 main.py sweep --config configs/transformer_sweep.yaml --skip-existing
 python3 main.py compare-runs --run-dirs outputs/sweeps/best_lstm outputs/sweeps_transformer/best_transformer --labels LSTM Transformer
+python3 main.py problem4-report --lstm-run-dir outputs/sweeps/best_lstm --transformer-run-dir outputs/sweeps_transformer/best_transformer
 python3 main.py evaluate --checkpoint outputs/best_model.pt
 python3 main.py plot --checkpoint outputs/best_model.pt
 ```
@@ -116,6 +117,11 @@ LSTM and Transformer runs are evaluated, use `python3 main.py compare-runs
 --run-dirs <lstm-run-dir> <transformer-run-dir> --labels LSTM Transformer` to
 put their metrics, parity plots, basin NSE, catchment KGE CDFs, seasonal skill,
 and selected hydrographs in the same comparison folder.
+
+For the assignment write-up, `python3 main.py problem4-report --lstm-run-dir
+<lstm-run-dir> --transformer-run-dir <transformer-run-dir>` creates
+`reports/problem4/problem4_report.md`, `reports/problem4/problem4_report.pdf`,
+and the supporting analysis figures.
 
 The default YAML uses a fixed basin split of 30 training basins, 10 validation
 basins, and 10 test basins. The split is stratified by `aridity` with

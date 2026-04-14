@@ -879,6 +879,63 @@ def _plot_monthly_comparison(runs: Sequence[Mapping[str, Any]], output_path: Pat
     return combined
 
 
+def _plot_flow_regime_comparison(runs: Sequence[Mapping[str, Any]], output_path: Path) -> pd.DataFrame:
+    frames = []
+    for run in runs:
+        regimes = _flow_regime_metrics(run["predictions"])
+        regimes["model_label"] = run["label"]
+        frames.append(regimes)
+    combined = pd.concat(frames, ignore_index=True)
+
+    regimes = [regime for regime in ["low_flow_obs_le_p10", "middle_flow", "peak_flow_obs_ge_p95"] if regime in set(combined["regime"])]
+    if not regimes:
+        return combined
+
+    fig, axes = plt.subplots(1, 2, figsize=(13, 4.8), sharex=True)
+    bias_ax, score_ax = axes
+    labels = list(combined["model_label"].dropna().unique())
+    x = np.arange(len(regimes), dtype=float)
+    width = 0.8 / max(1, len(labels))
+
+    for index, label in enumerate(labels):
+        subset = combined[combined["model_label"] == label].set_index("regime")
+        offset = (index - (len(labels) - 1) / 2) * width
+        color = _color_for_label(str(label), index)
+        bias_ax.bar(
+            x + offset,
+            subset.reindex(regimes)["percent_bias"],
+            width=width,
+            color=color,
+            alpha=0.8,
+            label=str(label),
+        )
+        score_ax.bar(
+            x + offset,
+            subset.reindex(regimes)["nse"],
+            width=width,
+            color=color,
+            alpha=0.8,
+            label=str(label),
+        )
+
+    for ax, ylabel, title in [
+        (bias_ax, "Percent bias (%)", "Flow-regime bias"),
+        (score_ax, "NSE", "Flow-regime NSE"),
+    ]:
+        ax.axhline(0.0, color="black", linewidth=1)
+        ax.set_xticks(x)
+        ax.set_xticklabels([regime.replace("_", " ") for regime in regimes], rotation=18, ha="right")
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+        ax.grid(axis="y", alpha=0.25)
+        ax.legend()
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=200)
+    plt.close(fig)
+    return combined
+
+
 def _write_comparison_summary(
     output_path: Path,
     runs: Sequence[Mapping[str, Any]],
@@ -966,6 +1023,8 @@ def compare_model_runs(args: Namespace) -> None:
 
     monthly = _plot_monthly_comparison(runs, output_dir / "monthly_metric_comparison.png")
     monthly.to_csv(output_dir / "monthly_metric_comparison.csv", index=False)
+    flow_regime = _plot_flow_regime_comparison(runs, output_dir / "flow_regime_comparison.png")
+    flow_regime.to_csv(output_dir / "flow_regime_comparison.csv", index=False)
 
     reference_metrics = runs[0]["basin_metrics"].sort_values("nse", ascending=False)
     basin_ids = [args.basin_id] if args.basin_id else [reference_metrics.iloc[0]["basin_id"], reference_metrics.iloc[-1]["basin_id"]]

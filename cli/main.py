@@ -184,6 +184,17 @@ def build_parser(train_defaults: Optional[dict] = None) -> argparse.ArgumentPars
     compare_runs.add_argument("--basin-id", default=None)
     compare_runs.add_argument("--max-scatter-points", type=int, default=50000)
 
+    problem4_report = subparsers.add_parser(
+        "problem4-report",
+        help="Create the Problem 4 evaluation report from LSTM and Transformer run directories.",
+    )
+    problem4_report.add_argument("--lstm-run-dir", required=True)
+    problem4_report.add_argument("--transformer-run-dir", required=True)
+    problem4_report.add_argument("--output-dir", default="reports/problem4")
+    problem4_report.add_argument("--repo-url", default=None)
+    problem4_report.add_argument("--data-dir", default=None)
+    problem4_report.add_argument("--max-scatter-points", type=int, default=50000)
+
     return parser
 
 
@@ -245,5 +256,9 @@ def main(argv: Optional[list[str]] = None) -> None:
         from evaluation.model_analysis import compare_model_runs
 
         compare_model_runs(args)
+    elif args.command == "problem4-report":
+        from evaluation.problem4_report import create_problem4_report
+
+        create_problem4_report(args)
     else:
         parser.error(f"Unknown command: {args.command}")

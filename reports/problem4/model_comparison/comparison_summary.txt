@@ -1,0 +1,21 @@
+Model comparison summary
+
+Overall held-out test metrics:
+- LSTM: NSE=0.5238, KGE=0.7593, RMSE=2.1738, MAE=0.9174
+- Transformer: NSE=0.2765, KGE=0.6265, RMSE=2.6794, MAE=1.0624
+
+Per-basin NSE delta (Transformer - LSTM):
+- Mean delta: -0.5728
+- Basins improved by Transformer: 2 of 10
+- Largest improvement: basin 04196800 (0.4187)
+- Largest degradation: basin 10258500 (-3.4593)
+
+Catchment KGE CDF summary:
+- LSTM: median KGE=0.5448, KGE<0=30.00%, KGE>=0.5=50.00%, KGE>=0.7=30.00%
+- Transformer: median KGE=0.2889, KGE<0=40.00%, KGE>=0.5=40.00%, KGE>=0.7=20.00%
+
+Interpretation guide:
+- Compare overall NSE/KGE first, then check whether one model mainly helps certain basins.
+- Use the basin delta plot to avoid hiding failures behind the overall mean.
+- Use the KGE CDF overlay to compare the whole distribution of catchment skill.
+- Use the reference-basin hydrographs and flow-duration curves to compare timing and high/low-flow bias.
