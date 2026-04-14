@@ -41,24 +41,299 @@ print(torch.cuda.is_available())
 print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "No GPU")
 ```
 
-## CLI
+## CLI Command Cookbook
+
+All commands should be run from the repository root.
+
+### Environment Setup
+
+Using `uv`:
+
+```bash
+uv venv --python 3.11 .venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+```
+
+Using standard `pip`:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r requirements.txt
+```
+
+If MiniCAMELS is missing, install it directly from GitHub:
+
+```bash
+python3 -m pip install git+https://github.com/BennettHydroLab/minicamels.git
+```
+
+### Inspect and Analyze the Dataset
+
+Quick dataset summary:
 
 ```bash
 python3 main.py summarize-data
-python3 main.py summarize-data --make-plots
-python3 main.py analyze-data --config configs/default.yaml
+```
+
+Dataset summary plus the assignment exploratory plots:
+
+```bash
+python3 main.py summarize-data --make-plots --output-dir outputs
+```
+
+Split-aware data analysis from the YAML config:
+
+```bash
+python3 main.py analyze-data --config configs/default.yaml --output-dir outputs/data_analysis
+```
+
+If the MiniCAMELS data are stored in a custom location, add `--data-dir`:
+
+```bash
+python3 main.py analyze-data \
+  --config configs/default.yaml \
+  --data-dir /path/to/minicamels \
+  --output-dir outputs/data_analysis
+```
+
+### Train One Model
+
+Train using the default YAML:
+
+```bash
 python3 main.py train --config configs/default.yaml
-python3 main.py train --model lstm --seq-len 30 --epochs 20 --loss mse --device auto
+```
+
+Train an LSTM with explicit arguments:
+
+```bash
+python3 main.py train \
+  --config configs/default.yaml \
+  --model lstm \
+  --seq-len 120 \
+  --window-stride 120 \
+  --hidden-size 128 \
+  --num-layers 1 \
+  --dropout 0.1 \
+  --batch-size 32 \
+  --lr 0.001 \
+  --loss nse \
+  --epochs 50 \
+  --split-strategy stratified \
+  --split-stratify-attribute aridity \
+  --train-basin-count 30 \
+  --val-basin-count 10 \
+  --test-basin-count 10 \
+  --output-dir outputs/single_lstm \
+  --checkpoint outputs/single_lstm/best_model.pt
+```
+
+Train a Transformer with explicit arguments:
+
+```bash
+python3 main.py train \
+  --config configs/transformer_sweep.yaml \
+  --model transformer \
+  --seq-len 120 \
+  --window-stride 120 \
+  --hidden-size 64 \
+  --num-layers 2 \
+  --nhead 4 \
+  --dim-feedforward 128 \
+  --dropout 0.2 \
+  --batch-size 128 \
+  --lr 0.001 \
+  --loss mse \
+  --epochs 100 \
+  --split-strategy stratified \
+  --split-stratify-attribute aridity \
+  --train-basin-count 30 \
+  --val-basin-count 10 \
+  --test-basin-count 10 \
+  --output-dir outputs/single_transformer \
+  --checkpoint outputs/single_transformer/best_model.pt
+```
+
+### Evaluate and Plot One Trained Model
+
+Evaluate a saved checkpoint on the held-out test basins:
+
+```bash
+python3 main.py evaluate \
+  --checkpoint outputs/single_lstm/best_model.pt \
+  --output-dir outputs/single_lstm
+```
+
+Create the basic evaluation plots from the evaluation outputs:
+
+```bash
+python3 main.py plot \
+  --checkpoint outputs/single_lstm/best_model.pt \
+  --output-dir outputs/single_lstm
+```
+
+Create paper-style analysis plots and tables for one completed run directory:
+
+```bash
+python3 main.py analyze-run --run-dir outputs/single_lstm
+```
+
+This writes files such as `metrics_summary.csv`, `parity_test_all.png`,
+`timeseries_best_basin.png`, `timeseries_worst_basin.png`,
+`basin_kge_cdf.png`, `flow_regime_metrics.csv`, and `discussion_notes.txt`
+under `outputs/single_lstm/paper_analysis/`.
+
+### Run the LSTM Sweep
+
+Check what will run without training:
+
+```bash
 python3 main.py sweep --config configs/default.yaml --dry-run
-python3 main.py sweep --config configs/default.yaml --skip-existing
-python3 main.py analyze-sweep --sweep-root outputs/sweeps
-python3 main.py sweep-plots --sweep-root outputs/sweeps
-python3 main.py analyze-run --run-dir outputs/sweeps/seq120_hidden256_batch128_lr0p003
-python3 main.py sweep --config configs/transformer_sweep.yaml --skip-existing
-python3 main.py compare-runs --run-dirs outputs/sweeps/best_lstm outputs/sweeps_transformer/best_transformer --labels LSTM Transformer
-python3 main.py problem4-report --lstm-run-dir outputs/sweeps/best_lstm --transformer-run-dir outputs/sweeps_transformer/best_transformer
-python3 main.py evaluate --checkpoint outputs/best_model.pt
-python3 main.py plot --checkpoint outputs/best_model.pt
+```
+
+Run or resume the LSTM sweep:
+
+```bash
+python3 main.py sweep \
+  --config configs/default.yaml \
+  --output-root outputs/sweeps_mse \
+  --skip-existing
+```
+
+Override a sweep from the command line:
+
+```bash
+python3 main.py sweep \
+  --config configs/default.yaml \
+  --seq-lens 30 60 90 120 \
+  --hidden-sizes 32 64 128 256 \
+  --batch-sizes 32 64 128 \
+  --loss nse \
+  --lr 0.001 \
+  --output-root outputs/sweeps_lstm_custom \
+  --skip-existing
+```
+
+### Analyze the Sweep Results
+
+Rank sweep runs and select the best model by validation NSE:
+
+```bash
+python3 main.py analyze-sweep \
+  --sweep-root outputs/sweeps_mse \
+  --selection-metric best_val_nse
+```
+
+Create grouped training-history plots for the sweep:
+
+```bash
+python3 main.py sweep-plots --sweep-root outputs/sweeps_mse
+```
+
+Plot only selected hyperparameter effects:
+
+```bash
+python3 main.py sweep-plots \
+  --sweep-root outputs/sweeps_mse \
+  --effects seq_len hidden_size batch_size lr
+```
+
+Analyze the best LSTM run:
+
+```bash
+python3 main.py analyze-run \
+  --run-dir outputs/sweeps_mse/seq120_hidden128_batch032_lr0p001
+```
+
+### Run and Analyze the Transformer Sweep
+
+Dry run:
+
+```bash
+python3 main.py sweep --config configs/transformer_sweep.yaml --dry-run
+```
+
+Run or resume:
+
+```bash
+python3 main.py sweep \
+  --config configs/transformer_sweep.yaml \
+  --output-root output/transformer_MSE_T1 \
+  --skip-existing
+```
+
+Analyze the Transformer sweep:
+
+```bash
+python3 main.py analyze-sweep \
+  --sweep-root output/transformer_MSE_T1 \
+  --selection-metric best_val_nse
+```
+
+Create Transformer sweep training-history plots:
+
+```bash
+python3 main.py sweep-plots --sweep-root output/transformer_MSE_T1
+```
+
+Analyze the best Transformer run:
+
+```bash
+python3 main.py analyze-run \
+  --run-dir output/transformer_MSE_T1/seq120_hidden064_batch128_lr0p001_drop0p2
+```
+
+### Compare LSTM and Transformer
+
+Create side-by-side model comparison plots and tables:
+
+```bash
+python3 main.py compare-runs \
+  --run-dirs \
+    outputs/sweeps_mse/seq120_hidden128_batch032_lr0p001 \
+    output/transformer_MSE_T1/seq120_hidden064_batch128_lr0p001_drop0p2 \
+  --labels LSTM Transformer \
+  --output-dir reports/problem4/model_comparison
+```
+
+This writes overall metric comparison plots, parity overlays, per-basin NSE
+comparison, KGE CDF comparison, seasonal metrics, flow-regime comparison, and
+best/worst basin hydrographs.
+
+### Create the Problem 4 Report
+
+Generate the Markdown report, PDF report, and all supporting figures:
+
+```bash
+python3 main.py problem4-report \
+  --lstm-run-dir outputs/sweeps_mse/seq120_hidden128_batch032_lr0p001 \
+  --transformer-run-dir output/transformer_MSE_T1/seq120_hidden064_batch128_lr0p001_drop0p2 \
+  --output-dir reports/problem4
+```
+
+Outputs:
+
+```text
+reports/problem4/problem4_report.md
+reports/problem4/problem4_report.pdf
+reports/problem4/lstm_analysis/
+reports/problem4/transformer_analysis/
+reports/problem4/model_comparison/
+```
+
+### Useful Help Commands
+
+```bash
+python3 main.py --help
+python3 main.py train --help
+python3 main.py evaluate --help
+python3 main.py sweep --help
+python3 main.py analyze-sweep --help
+python3 main.py analyze-run --help
+python3 main.py compare-runs --help
+python3 main.py problem4-report --help
 ```
 
 When using `--config`, command-line flags override YAML values. For example:
@@ -75,31 +350,32 @@ actual KGE and NSE metric values. For NSE/KGE validation, `val_loss` is computed
 from the full validation set metric, not as an average of per-batch NSE/KGE.
 
 The sweep grid is controlled from the `sweep` section of the YAML config. The
-default assignment grid is:
+current LSTM sweep in `configs/default.yaml` is:
 
 ```yaml
 sweep:
-  output_root: outputs/sweeps
-  loss: kge
+  output_root: outputs/sweeps_mse/
+  loss: nse
   learning_rate: 0.001
   grid:
-    seq_len: [30, 60, 90, 120, 360]
+    seq_len: [30, 60, 90, 120]
     hidden_size: [32, 64, 128, 256]
-    batch_size: [26, 32, 64, 128]
+    batch_size: [32, 64, 128, 256]
+    learning_rate: [0.001, 0.003, 0.0005]
 ```
 
 Any training argument can be swept by adding it to `sweep.grid`, for example
 `learning_rate: [0.0001, 0.0005, 0.001]` or `dropout: [0.0, 0.1, 0.2]`.
-Each run is saved under `outputs/sweeps/` with its own checkpoint, history,
-metrics, and plots. Sweep runs use non-overlapping windows by setting the
+Each run is saved under the sweep `output_root` with its own checkpoint,
+history, metrics, and plots. Sweep runs use non-overlapping windows by setting the
 stride equal to each sequence length when `window_stride` is null.
 
 After the sweep finishes, use `python3 main.py sweep-plots --sweep-root
-outputs/sweeps` to create combined training-history figures under
-`outputs/sweeps/comparison_plots/`. These compare one hyperparameter at a time
-for the variables that changed across the sweep runs.
+<sweep-root>` to create combined training-history figures under
+`<sweep-root>/comparison_plots/`. These compare one hyperparameter at a time for
+the variables that changed across the sweep runs.
 
-Use `python3 main.py analyze-sweep --sweep-root outputs/sweeps` to rank runs by
+Use `python3 main.py analyze-sweep --sweep-root <sweep-root>` to rank runs by
 validation performance, write top-run tables, create parameter-effect summary
 plots, and save `best_model_summary.txt`. By default the best run is selected
 by `best_val_nse`; test NSE/KGE are reported after selection, not used to choose
