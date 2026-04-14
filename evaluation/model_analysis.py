@@ -39,6 +39,18 @@ _ATTRIBUTE_COLUMNS = [
 ]
 
 
+def _resolve_run_dir(path: str | Path) -> Path:
+    run_dir = Path(path)
+    if run_dir.name in {
+        "test_predictions.csv",
+        "test_metrics.json",
+        "test_metrics_by_basin.csv",
+        "training_history.csv",
+    }:
+        return run_dir.parent
+    return run_dir
+
+
 def _read_json(path: Path) -> Dict[str, Any]:
     if not path.exists():
         return {}
@@ -234,6 +246,61 @@ def _plot_basin_metric_rank(metrics_by_basin: pd.DataFrame, output_path: Path) -
     plt.close(fig)
 
 
+def _metric_cdf_summary(
+    frame: pd.DataFrame,
+    metric: str,
+    group_column: str | None = None,
+) -> pd.DataFrame:
+    rows = []
+    groups = [(None, frame)] if group_column is None else frame.groupby(group_column)
+    for group_name, group in groups:
+        values = pd.to_numeric(group[metric], errors="coerce").dropna()
+        if values.empty:
+            continue
+        row = {
+            "metric": metric,
+            "n_catchments": int(len(values)),
+            "min": float(values.min()),
+            "p25": float(values.quantile(0.25)),
+            "median": float(values.median()),
+            "p75": float(values.quantile(0.75)),
+            "max": float(values.max()),
+            "fraction_below_0": float((values < 0.0).mean()),
+            "fraction_above_0p5": float((values >= 0.5).mean()),
+            "fraction_above_0p7": float((values >= 0.7).mean()),
+        }
+        if group_column is not None:
+            row[group_column] = group_name
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def _plot_basin_metric_cdf(
+    metrics_by_basin: pd.DataFrame,
+    metric: str,
+    output_path: Path,
+) -> None:
+    values = pd.to_numeric(metrics_by_basin[metric], errors="coerce").dropna().sort_values()
+    if values.empty:
+        return
+    cdf = np.arange(1, len(values) + 1) / len(values)
+
+    fig, ax = plt.subplots(figsize=(6.5, 5))
+    ax.step(values, cdf, where="post", color="#0072B2", linewidth=2.0)
+    ax.scatter(values, cdf, color="#0072B2", s=25, alpha=0.8)
+    ax.axvline(0.0, color="black", linestyle="--", linewidth=1, label=f"{metric.upper()}=0")
+    ax.axvline(float(values.median()), color="#D55E00", linestyle=":", linewidth=1.5, label="median")
+    ax.set_xlabel(metric.upper())
+    ax.set_ylabel("Cumulative fraction of catchments")
+    ax.set_ylim(0.0, 1.02)
+    ax.set_title(f"Catchment CDF of {metric.upper()}")
+    ax.grid(alpha=0.25)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=200)
+    plt.close(fig)
+
+
 def _monthly_metrics(predictions: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for month, group in predictions.groupby(predictions["date"].dt.month):
@@ -412,6 +479,19 @@ def _write_discussion_notes(
             f"- Worst basin {worst['basin_id']}: NSE={worst['nse']:.4f}, KGE={worst['kge']:.4f}, RMSE={worst['rmse']:.4f}",
         ]
     )
+    kge_summary = _metric_cdf_summary(metrics_by_basin, "kge")
+    if not kge_summary.empty:
+        row = kge_summary.iloc[0]
+        lines.extend(
+            [
+                "",
+                "Catchment KGE CDF summary:",
+                f"- Median KGE: {row['median']:.4f}",
+                f"- Fraction of catchments with KGE < 0: {row['fraction_below_0']:.2%}",
+                f"- Fraction of catchments with KGE >= 0.5: {row['fraction_above_0p5']:.2%}",
+                f"- Fraction of catchments with KGE >= 0.7: {row['fraction_above_0p7']:.2%}",
+            ]
+        )
 
     if metrics_with_attrs is not None and not metrics_with_attrs.empty:
         attr_lookup = metrics_with_attrs.set_index("basin_id")
@@ -448,6 +528,7 @@ def _write_discussion_notes(
             "",
             "Interpretation guide:",
             "- Use the best/worst basin plots to discuss where timing, amplitude, or recession behavior is captured or missed.",
+            "- Use the KGE CDF to describe the distribution of model skill across catchments, not only the average score.",
             "- Use the attribute plots to connect skill differences to climate and catchment properties such as aridity, snow fraction, area, or mean flow.",
             "- Use the seasonal and flow-regime plots to discuss whether the model is better for ordinary flows, low flows, or peaks.",
         ]
@@ -457,7 +538,7 @@ def _write_discussion_notes(
 
 def analyze_model_run(args: Namespace) -> None:
     """Create report-style plots and tables for one evaluated run."""
-    run_dir = Path(args.run_dir)
+    run_dir = _resolve_run_dir(args.run_dir)
     output_dir = Path(args.output_dir) if args.output_dir else run_dir / "paper_analysis"
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -481,6 +562,8 @@ def analyze_model_run(args: Namespace) -> None:
     )
     _plot_basin_metric_distribution(metrics_by_basin, output_dir / "basin_metric_distribution.png")
     _plot_basin_metric_rank(metrics_by_basin, output_dir / "basin_metric_rank_by_nse.png")
+    _metric_cdf_summary(metrics_by_basin, "kge").to_csv(output_dir / "basin_kge_cdf_summary.csv", index=False)
+    _plot_basin_metric_cdf(metrics_by_basin, "kge", output_dir / "basin_kge_cdf.png")
     _plot_timeseries(predictions, best_basin, metrics_by_basin, output_dir / "timeseries_best_basin.png", "Best test basin")
     _plot_timeseries(predictions, worst_basin, metrics_by_basin, output_dir / "timeseries_worst_basin.png", "Worst test basin")
     _plot_flow_duration(predictions, best_basin, output_dir / "flow_duration_best_basin.png", "Flow duration curve, best basin")
@@ -657,6 +740,47 @@ def _plot_basin_nse_delta(combined: pd.DataFrame, output_path: Path) -> None:
     plt.close(fig)
 
 
+def _plot_metric_cdf_comparison(
+    combined: pd.DataFrame,
+    metric: str,
+    output_path: Path,
+) -> None:
+    if metric not in combined.columns or "model_label" not in combined.columns:
+        return
+
+    fig, ax = plt.subplots(figsize=(6.5, 5))
+    plotted = False
+    for index, (label, group) in enumerate(combined.groupby("model_label")):
+        values = pd.to_numeric(group[metric], errors="coerce").dropna().sort_values()
+        if values.empty:
+            continue
+        cdf = np.arange(1, len(values) + 1) / len(values)
+        ax.step(
+            values,
+            cdf,
+            where="post",
+            color=_color_for_label(str(label), index),
+            linewidth=2.0,
+            label=str(label),
+        )
+        plotted = True
+
+    if not plotted:
+        plt.close(fig)
+        return
+
+    ax.axvline(0.0, color="black", linestyle="--", linewidth=1, label=f"{metric.upper()}=0")
+    ax.set_xlabel(metric.upper())
+    ax.set_ylabel("Cumulative fraction of catchments")
+    ax.set_ylim(0.0, 1.02)
+    ax.set_title(f"Catchment CDF of {metric.upper()}")
+    ax.grid(alpha=0.25)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=200)
+    plt.close(fig)
+
+
 def _plot_comparison_timeseries(
     runs: Sequence[Mapping[str, Any]],
     basin_id: str,
@@ -783,12 +907,24 @@ def _write_comparison_summary(
             ]
         )
 
+    kge_cdf = _metric_cdf_summary(combined_basin_metrics, "kge", group_column="model_label")
+    if not kge_cdf.empty:
+        lines.extend(["", "Catchment KGE CDF summary:"])
+        for _, row in kge_cdf.iterrows():
+            lines.append(
+                f"- {row['model_label']}: median KGE={row['median']:.4f}, "
+                f"KGE<0={row['fraction_below_0']:.2%}, "
+                f"KGE>=0.5={row['fraction_above_0p5']:.2%}, "
+                f"KGE>=0.7={row['fraction_above_0p7']:.2%}"
+            )
+
     lines.extend(
         [
             "",
             "Interpretation guide:",
             "- Compare overall NSE/KGE first, then check whether one model mainly helps certain basins.",
             "- Use the basin delta plot to avoid hiding failures behind the overall mean.",
+            "- Use the KGE CDF overlay to compare the whole distribution of catchment skill.",
             "- Use the reference-basin hydrographs and flow-duration curves to compare timing and high/low-flow bias.",
         ]
     )
@@ -797,7 +933,7 @@ def _write_comparison_summary(
 
 def compare_model_runs(args: Namespace) -> None:
     """Compare evaluated LSTM and Transformer run directories."""
-    run_dirs = [Path(path) for path in args.run_dirs]
+    run_dirs = [_resolve_run_dir(path) for path in args.run_dirs]
     if args.labels and len(args.labels) != len(run_dirs):
         raise ValueError("--labels must have the same length as --run-dirs.")
 
@@ -820,6 +956,11 @@ def compare_model_runs(args: Namespace) -> None:
     combined_basin_metrics.to_csv(output_dir / "basin_metric_comparison_long.csv", index=False)
     _plot_basin_nse_comparison(combined_basin_metrics, output_dir / "basin_nse_comparison.png")
     _plot_basin_nse_delta(combined_basin_metrics, output_dir / "basin_nse_delta.png")
+    _metric_cdf_summary(combined_basin_metrics, "kge", group_column="model_label").to_csv(
+        output_dir / "basin_kge_cdf_summary_by_model.csv",
+        index=False,
+    )
+    _plot_metric_cdf_comparison(combined_basin_metrics, "kge", output_dir / "basin_kge_cdf_comparison.png")
 
     monthly = _plot_monthly_comparison(runs, output_dir / "monthly_metric_comparison.png")
     monthly.to_csv(output_dir / "monthly_metric_comparison.csv", index=False)

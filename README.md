@@ -110,12 +110,12 @@ when you are ready to compare architectures.
 
 Use `python3 main.py analyze-run --run-dir <completed-run-dir>` for
 paper-style test-set figures: overall metric tables, parity plots, best/worst
-basin hydrographs, flow-duration curves, per-basin NSE/KGE plots, seasonal
-skill, flow-regime bias, and discussion notes. Once both LSTM and Transformer
-runs are evaluated, use `python3 main.py compare-runs --run-dirs <lstm-run-dir>
-<transformer-run-dir> --labels LSTM Transformer` to put their metrics,
-parity plots, basin NSE, seasonal skill, and selected hydrographs in the same
-comparison folder.
+basin hydrographs, flow-duration curves, per-basin NSE/KGE plots, KGE CDF over
+catchments, seasonal skill, flow-regime bias, and discussion notes. Once both
+LSTM and Transformer runs are evaluated, use `python3 main.py compare-runs
+--run-dirs <lstm-run-dir> <transformer-run-dir> --labels LSTM Transformer` to
+put their metrics, parity plots, basin NSE, catchment KGE CDFs, seasonal skill,
+and selected hydrographs in the same comparison folder.
 
 The default YAML uses a fixed basin split of 30 training basins, 10 validation
 basins, and 10 test basins. The split is stratified by `aridity` with
