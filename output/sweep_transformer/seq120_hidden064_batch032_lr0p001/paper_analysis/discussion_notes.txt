@@ -1,0 +1,38 @@
+Run directory: output/sweep_transformer/seq120_hidden064_batch032_lr0p001
+
+Overall held-out test metrics:
+- NSE: 0.4781
+- KGE: 0.6597
+- RMSE: 2.2756
+- MAE: 0.9607
+- MSE: 5.1782
+
+Best and worst test basins by NSE:
+- Best basin 11468500: NSE=0.9271, KGE=0.8953, RMSE=0.7729
+- Worst basin 10258500: NSE=-55.0943, KGE=-20.3656, RMSE=0.7884
+
+Catchment KGE CDF summary:
+- Median KGE: 0.4693
+- Fraction of catchments with KGE < 0: 40.00%
+- Fraction of catchments with KGE >= 0.5: 50.00%
+- Fraction of catchments with KGE >= 0.7: 40.00%
+
+Catchment attributes to use in the discussion:
+- Best basin 11468500: aridity=0.758, q_mean=1.78, runoff_ratio=0.497, baseflow_index=0.39, mean_prcp=3.58, mean_pet=2.72, frac_snow=0.000524, area_km2=274, elev_mean=276, slope_mean=45.1, frac_forest=1, lai_max=4.76
+- Worst basin 10258500: aridity=3.82, q_mean=0.047, runoff_ratio=0.0571, baseflow_index=0.298, mean_prcp=0.823, mean_pet=3.14, frac_snow=0.00409, area_km2=242, elev_mean=1.33e+03, slope_mean=116, frac_forest=0.285, lai_max=0.544
+
+Seasonality:
+- Highest monthly NSE occurs in month 11: NSE=0.8480
+- Lowest monthly NSE occurs in month 4: NSE=-2.2893
+
+Flow-regime bias:
+- all: percent_bias=23.72%, NSE=0.4781, n=875
+- low_flow_obs_le_p10: percent_bias=52866.00%, NSE=-92958.8518, n=88
+- middle_flow: percent_bias=36.63%, NSE=0.0095, n=743
+- peak_flow_obs_ge_p95: percent_bias=-11.58%, NSE=-0.5239, n=44
+
+Interpretation guide:
+- Use the best/worst basin plots to discuss where timing, amplitude, or recession behavior is captured or missed.
+- Use the KGE CDF to describe the distribution of model skill across catchments, not only the average score.
+- Use the attribute plots to connect skill differences to climate and catchment properties such as aridity, snow fraction, area, or mean flow.
+- Use the seasonal and flow-regime plots to discuss whether the model is better for ordinary flows, low flows, or peaks.

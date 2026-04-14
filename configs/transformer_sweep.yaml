@@ -37,7 +37,7 @@ model:
   dropout: 0.1
 
 training:
-  epochs: 50
+  epochs: 100
   batch_size: 128
   learning_rate: 0.001
   loss: nse
@@ -49,16 +49,18 @@ training:
   device: auto
   num_workers: 2
   output_dir: outputs
-  checkpoint_path: outputs/best_model.pt
+  checkpoint_path: outputs/transformer_MSE_T1/best_model.pt
 
 sweep:
-  output_root: outputs/sweeps_transformer_T1
-  eval_batch_size: 256
+  output_root: output/transformer_MSE_T1
+  eval_batch_size: 128
   evaluate: true
-  loss: nse
+  loss: mse
   learning_rate: 0.001
   grid:
-    seq_len: [30, 60, 90, 120]
-    hidden_size: [32, 64, 128, 256]
-    batch_size: [32, 64, 128, 256]
-    learning_rate: [0.001, 0.003, 0.0005]
+    seq_len: [ 90, 120,150,180]
+    hidden_size: [32, 64, 128,]
+    batch_size: [32, 64, 128, ]
+    learning_rate: [0.001, 0.0001]
+    dropout: [0.1, 0.2]
+

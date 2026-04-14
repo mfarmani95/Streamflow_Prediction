@@ -1,0 +1,22 @@
+Best model selected by best_val_kge
+run_name: seq120_hidden064_batch032_lr0p001
+checkpoint: output/sweep_transformer/seq120_hidden064_batch032_lr0p001/best_model.pt
+model: transformer
+loss: mse
+seq_len: 120
+window_stride: 120
+hidden_size: 64
+num_layers: 2
+nhead: 4
+dim_feedforward: 128
+dropout: 0.1
+batch_size: 32
+lr: 0.001
+best_val_loss: 0.1680268677893314
+best_val_nse: 0.7709712156011254
+best_val_kge: 0.8636025651840245
+test_nse: 0.4781490349321008
+test_kge: 0.6596976836082822
+test_rmse: 2.275572756109386
+test_mse: 5.1782313683472685
+test_mae: 0.9607486953735351

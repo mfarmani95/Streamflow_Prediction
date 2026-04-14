@@ -1,0 +1,4 @@
+left,right,correlation
+best_val_nse,test_nse,0.2845972174153751
+best_val_kge,test_kge,0.07164511818997281
+best_val_loss,test_nse,0.24899158277866068
