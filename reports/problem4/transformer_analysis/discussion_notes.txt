@@ -17,6 +17,10 @@ Catchment KGE CDF summary:
 - Fraction of catchments with KGE >= 0.5: 40.00%
 - Fraction of catchments with KGE >= 0.7: 20.00%
 
+Catchment attributes to use in the discussion:
+- Best basin 14308990: aridity=0.838, q_mean=1.26, runoff_ratio=0.344, baseflow_index=0.552, mean_prcp=3.66, mean_pet=3.06, frac_snow=0.136, area_km2=168, elev_mean=987, slope_mean=96.6, frac_forest=1, lai_max=4.61
+- Worst basin 10258500: aridity=3.82, q_mean=0.047, runoff_ratio=0.0571, baseflow_index=0.298, mean_prcp=0.823, mean_pet=3.14, frac_snow=0.00409, area_km2=242, elev_mean=1.33e+03, slope_mean=116, frac_forest=0.285, lai_max=0.544
+
 Seasonality:
 - Highest monthly NSE occurs in month 10: NSE=0.7220
 - Lowest monthly NSE occurs in month 4: NSE=-0.8762
