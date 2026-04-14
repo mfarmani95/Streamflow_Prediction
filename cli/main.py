@@ -165,6 +165,25 @@ def build_parser(train_defaults: Optional[dict] = None) -> argparse.ArgumentPars
     analyze_sweep.add_argument("--ascending", action="store_true", default=None)
     analyze_sweep.add_argument("--descending", dest="ascending", action="store_false")
 
+    analyze_run = subparsers.add_parser(
+        "analyze-run",
+        help="Create paper-style analysis plots for one evaluated run directory.",
+    )
+    analyze_run.add_argument("--run-dir", required=True)
+    analyze_run.add_argument("--output-dir", default=None)
+    analyze_run.add_argument("--data-dir", default=None)
+    analyze_run.add_argument("--max-scatter-points", type=int, default=100000)
+
+    compare_runs = subparsers.add_parser(
+        "compare-runs",
+        help="Compare evaluated LSTM/Transformer run directories.",
+    )
+    compare_runs.add_argument("--run-dirs", nargs="+", required=True)
+    compare_runs.add_argument("--labels", nargs="+", default=None)
+    compare_runs.add_argument("--output-dir", default="outputs/model_comparison")
+    compare_runs.add_argument("--basin-id", default=None)
+    compare_runs.add_argument("--max-scatter-points", type=int, default=50000)
+
     return parser
 
 
@@ -218,5 +237,13 @@ def main(argv: Optional[list[str]] = None) -> None:
         from evaluation.sweep_analysis import analyze_sweep
 
         analyze_sweep(args)
+    elif args.command == "analyze-run":
+        from evaluation.model_analysis import analyze_model_run
+
+        analyze_model_run(args)
+    elif args.command == "compare-runs":
+        from evaluation.model_analysis import compare_model_runs
+
+        compare_model_runs(args)
     else:
         parser.error(f"Unknown command: {args.command}")

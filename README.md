@@ -53,7 +53,9 @@ python3 main.py sweep --config configs/default.yaml --dry-run
 python3 main.py sweep --config configs/default.yaml --skip-existing
 python3 main.py analyze-sweep --sweep-root outputs/sweeps
 python3 main.py sweep-plots --sweep-root outputs/sweeps
+python3 main.py analyze-run --run-dir outputs/sweeps/seq120_hidden256_batch128_lr0p003
 python3 main.py sweep --config configs/transformer_sweep.yaml --skip-existing
+python3 main.py compare-runs --run-dirs outputs/sweeps/best_lstm outputs/sweeps_transformer/best_transformer --labels LSTM Transformer
 python3 main.py evaluate --checkpoint outputs/best_model.pt
 python3 main.py plot --checkpoint outputs/best_model.pt
 ```
@@ -105,6 +107,15 @@ the hyperparameters.
 `configs/transformer_sweep.yaml` mirrors the LSTM sweep layout but sets
 `model.name: transformer`, so it can be launched with the same `sweep` command
 when you are ready to compare architectures.
+
+Use `python3 main.py analyze-run --run-dir <completed-run-dir>` for
+paper-style test-set figures: overall metric tables, parity plots, best/worst
+basin hydrographs, flow-duration curves, per-basin NSE/KGE plots, seasonal
+skill, flow-regime bias, and discussion notes. Once both LSTM and Transformer
+runs are evaluated, use `python3 main.py compare-runs --run-dirs <lstm-run-dir>
+<transformer-run-dir> --labels LSTM Transformer` to put their metrics,
+parity plots, basin NSE, seasonal skill, and selected hydrographs in the same
+comparison folder.
 
 The default YAML uses a fixed basin split of 30 training basins, 10 validation
 basins, and 10 test basins. The split is stratified by `aridity` with
