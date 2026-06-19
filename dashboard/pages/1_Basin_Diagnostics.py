@@ -55,6 +55,7 @@ def _metric_color_frame(frame: pd.DataFrame, metric: str) -> pd.DataFrame:
     valid = values.dropna()
     if valid.empty:
         colored["color"] = [[15, 118, 110, 180]] * len(colored)
+        colored.attrs["legend"] = None
         return colored
 
     metric_lower_is_better = metric in {"mse", "mae", "rmse"}
@@ -68,6 +69,12 @@ def _metric_color_frame(frame: pd.DataFrame, metric: str) -> pd.DataFrame:
         return _interpolate_color("#E76F51", "#0F766E", score)
 
     colored["color"] = values.map(_color_for_value)
+    colored.attrs["legend"] = {
+        "metric": metric,
+        "minimum": minimum,
+        "maximum": maximum,
+        "lower_is_better": metric_lower_is_better,
+    }
     return colored
 
 
@@ -109,6 +116,27 @@ def _render_basin_metric_map(frame: pd.DataFrame, metric: str) -> None:
         ),
         use_container_width=True,
     )
+    legend = map_frame.attrs.get("legend")
+    if legend is not None:
+        better_left = "Better" if legend["lower_is_better"] else "Worse"
+        better_right = "Worse" if legend["lower_is_better"] else "Better"
+        st.markdown(
+            f"""
+            <div class="legend-card">
+                <div class="legend-title">{legend['metric'].upper()} color scale</div>
+                <div class="legend-bar"></div>
+                <div class="legend-scale">
+                    <span>{legend['minimum']:.3f}</span>
+                    <span>{legend['maximum']:.3f}</span>
+                </div>
+                <p class="legend-note">
+                    Left: {better_left} for the selected scale direction.
+                    Right: {better_right}. Lower-is-better metrics like RMSE and MAE are reversed automatically.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def main() -> None:

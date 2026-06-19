@@ -69,6 +69,18 @@ def inject_styles() -> None:
         [data-testid="stSidebar"] h3 {{
             color: #E6EEF8;
         }}
+        [data-testid="stSidebarNav"] * {{
+            font-size: 1.04rem !important;
+        }}
+        [data-testid="stSidebarNav"] > div > div > div > div {{
+            font-size: 1.12rem !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.01em;
+        }}
+        [data-testid="stSidebarNav"] a {{
+            font-size: 1.02rem !important;
+            font-weight: 600 !important;
+        }}
         [data-testid="stSidebar"] input,
         [data-testid="stSidebar"] textarea,
         [data-testid="stSidebar"] [data-baseweb="select"] input,
@@ -164,6 +176,39 @@ def inject_styles() -> None:
             background: rgba(255, 255, 255, 0.76);
             border: 1px solid rgba(15, 118, 110, 0.10);
             color: {INK};
+        }}
+        .legend-card {{
+            margin-top: 0.75rem;
+            padding: 0.95rem 1rem 0.85rem 1rem;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.82);
+            border: 1px solid rgba(16, 42, 67, 0.08);
+        }}
+        .legend-title {{
+            color: {INK};
+            font-size: 0.92rem;
+            font-weight: 700;
+            margin-bottom: 0.55rem;
+        }}
+        .legend-bar {{
+            height: 14px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #E76F51 0%, #F4C95D 50%, #0F766E 100%);
+            border: 1px solid rgba(16, 42, 67, 0.08);
+        }}
+        .legend-scale {{
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.45rem;
+            color: {MUTED};
+            font-size: 0.86rem;
+            font-weight: 600;
+        }}
+        .legend-note {{
+            color: {MUTED};
+            font-size: 0.84rem;
+            margin-top: 0.5rem;
+            margin-bottom: 0;
         }}
         div[data-testid="stMetric"] {{
             background: transparent;
