@@ -126,6 +126,25 @@ export STREAMFLOW_API_URL=http://127.0.0.1:8000
 streamlit run dashboard/app.py
 ```
 
+For deployment on Streamlit Community Cloud, the dashboard can also run without
+the FastAPI service. By default, it reads committed run artifacts directly from
+the repository and uses the lighter dependency set in
+`dashboard/requirements.txt`.
+
+## Deploy On Streamlit Community Cloud
+
+The simplest live deployment path for this repo is the Streamlit dashboard only.
+
+1. Go to Streamlit Community Cloud and connect your GitHub account.
+2. Click `Create app`.
+3. Select repository `mfarmani95/Streamflow_Prediction`.
+4. Set the branch to `main`.
+5. Set the main file path to `dashboard/app.py`.
+6. Deploy.
+
+After the app is live, keep `Use FastAPI backend` turned off unless you later
+deploy the API separately.
+
 ## CI
 
 The repository includes a GitHub Actions workflow at
