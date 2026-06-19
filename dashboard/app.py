@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import os
+import sys
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import requests
 import streamlit as st
 
-from analytics.run_catalog import (
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from analytics.run_catalog import (  # noqa: E402
     get_monthly_summary,
     get_run,
     get_run_basin_metrics,
