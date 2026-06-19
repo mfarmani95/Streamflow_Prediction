@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import altair as alt
 import pandas as pd
 import requests
 import streamlit as st
@@ -49,8 +50,33 @@ def _inject_styles() -> None:
         [data-testid="stSidebar"] {{
             background: linear-gradient(180deg, #0F172A 0%, #132238 100%);
         }}
-        [data-testid="stSidebar"] * {{
+        [data-testid="stSidebar"] label,
+        [data-testid="stSidebar"] .stMarkdown,
+        [data-testid="stSidebar"] .stCaption,
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] h1,
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3 {{
             color: #E6EEF8;
+        }}
+        [data-testid="stSidebar"] input,
+        [data-testid="stSidebar"] textarea,
+        [data-testid="stSidebar"] [data-baseweb="select"] input,
+        [data-testid="stSidebar"] [data-baseweb="base-input"] input {{
+            color: #102A43 !important;
+            -webkit-text-fill-color: #102A43 !important;
+        }}
+        [data-testid="stSidebar"] [data-baseweb="select"] > div,
+        [data-testid="stSidebar"] [data-baseweb="base-input"] > div,
+        [data-testid="stSidebar"] [data-testid="stTextInputRootElement"] > div,
+        [data-testid="stSidebar"] [data-testid="stNumberInputRootElement"] > div {{
+            background: rgba(255, 255, 255, 0.94) !important;
+            border: 1px solid rgba(148, 163, 184, 0.45) !important;
+            color: #102A43 !important;
+        }}
+        [data-testid="stSidebar"] svg {{
+            fill: #102A43;
+            color: #102A43;
         }}
         .hero-card {{
             padding: 1.6rem 1.7rem;
@@ -276,6 +302,59 @@ def _render_section_header(kicker: str, title: str) -> None:
     )
 
 
+def _render_timeseries_chart(frame: pd.DataFrame, x_field: str) -> None:
+    chart_frame = frame.copy()
+    chart_frame[x_field] = pd.to_datetime(chart_frame[x_field])
+    long_frame = chart_frame.melt(
+        id_vars=[x_field],
+        value_vars=["observed", "predicted"],
+        var_name="series",
+        value_name="flow",
+    )
+    long_frame["series_label"] = long_frame["series"].map(
+        {"observed": "Observed", "predicted": "Predicted"}
+    )
+
+    chart = (
+        alt.Chart(long_frame)
+        .mark_line(strokeWidth=2.6)
+        .encode(
+            x=alt.X(f"{x_field}:T", title=None),
+            y=alt.Y("flow:Q", title="Flow"),
+            color=alt.Color(
+                "series_label:N",
+                scale=alt.Scale(
+                    domain=["Observed", "Predicted"],
+                    range=["#0F766E", "#F59E0B"],
+                ),
+                legend=alt.Legend(title=None, orient="top"),
+            ),
+            strokeDash=alt.StrokeDash(
+                "series_label:N",
+                scale=alt.Scale(
+                    domain=["Observed", "Predicted"],
+                    range=[[1, 0], [8, 5]],
+                ),
+                legend=None,
+            ),
+            tooltip=[
+                alt.Tooltip(f"{x_field}:T", title="Date"),
+                alt.Tooltip("series_label:N", title="Series"),
+                alt.Tooltip("flow:Q", title="Flow", format=".3f"),
+            ],
+        )
+        .properties(height=320)
+        .configure_view(strokeOpacity=0)
+        .configure_axis(
+            labelColor=MUTED,
+            titleColor=INK,
+            gridColor="rgba(15, 23, 42, 0.08)",
+        )
+        .configure_legend(labelColor=INK, titleColor=INK)
+    )
+    st.altair_chart(chart, use_container_width=True)
+
+
 def main() -> None:
     st.set_page_config(
         page_title="Streamflow Run Explorer",
@@ -382,8 +461,7 @@ def main() -> None:
             if monthly_frame.empty:
                 st.info("Monthly summaries are not available for this run.")
             else:
-                monthly_chart = monthly_frame.set_index("month")[["observed", "predicted"]]
-                st.line_chart(monthly_chart, color=["#0F766E", "#F59E0B"], use_container_width=True)
+                _render_timeseries_chart(monthly_frame, "month")
                 residual_summary = monthly_frame["residual"].abs().mean()
                 st.caption(f"Average monthly absolute residual: {_format_metric(residual_summary)}")
 
@@ -433,8 +511,7 @@ def main() -> None:
             if timeseries_frame.empty:
                 st.info("No time series records are available for this basin.")
             else:
-                timeseries_chart = timeseries_frame.set_index("date")[["observed", "predicted"]]
-                st.line_chart(timeseries_chart, color=["#0F766E", "#F59E0B"], use_container_width=True)
+                _render_timeseries_chart(timeseries_frame, "date")
                 latest_rows = timeseries_frame.tail(15).copy()
                 latest_rows["residual"] = latest_rows["residual"].map(lambda value: round(float(value), 3))
                 st.dataframe(latest_rows, use_container_width=True, hide_index=True)
