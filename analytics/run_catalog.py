@@ -165,6 +165,53 @@ def get_run_predictions(
     return _load_predictions(_predictions_path_for_run(run_id, run_roots))
 
 
+def _coordinates_from_attributes_exports() -> pd.DataFrame:
+    coordinate_frames: list[pd.DataFrame] = []
+    search_roots = [REPO_ROOT / "reports", REPO_ROOT / "output", REPO_ROOT / "outputs"]
+    for root in search_roots:
+        if not root.exists():
+            continue
+        for path in root.rglob("basin_performance_with_attributes.csv"):
+            frame = pd.read_csv(path, usecols=["basin_id", "lat", "lon"], dtype={"basin_id": str})
+            coordinate_frames.append(frame)
+
+    if not coordinate_frames:
+        return pd.DataFrame(columns=["basin_id", "lat", "lon"])
+
+    coordinates = pd.concat(coordinate_frames, ignore_index=True).dropna(subset=["lat", "lon"])
+    coordinates["basin_id"] = coordinates["basin_id"].astype(str)
+    return coordinates.drop_duplicates(subset=["basin_id"]).reset_index(drop=True)
+
+
+def _coordinates_from_minicamels(data_dir: Optional[str] = None) -> pd.DataFrame:
+    try:
+        from dataset.minicamels_dataset import _normalize_basin_id, _require_minicamels
+    except ImportError:
+        return pd.DataFrame(columns=["basin_id", "lat", "lon"])
+
+    try:
+        MiniCamels = _require_minicamels()
+        client = MiniCamels(local_data_dir=data_dir)
+        attributes = client.attributes().copy()
+    except Exception:
+        return pd.DataFrame(columns=["basin_id", "lat", "lon"])
+
+    if not {"lat", "lon"}.issubset(attributes.columns):
+        return pd.DataFrame(columns=["basin_id", "lat", "lon"])
+
+    attributes = attributes.reset_index().rename(columns={attributes.index.name or "index": "basin_id"})
+    attributes["basin_id"] = attributes["basin_id"].map(_normalize_basin_id)
+    return attributes[["basin_id", "lat", "lon"]].dropna(subset=["lat", "lon"]).drop_duplicates("basin_id")
+
+
+def get_basin_coordinates(data_dir: Optional[str] = None) -> pd.DataFrame:
+    """Return basin coordinates keyed by basin_id."""
+    coordinates = _coordinates_from_attributes_exports()
+    if not coordinates.empty:
+        return coordinates
+    return _coordinates_from_minicamels(data_dir=data_dir)
+
+
 def get_run_timeseries(
     run_id: str,
     basin_id: str,

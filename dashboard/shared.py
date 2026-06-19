@@ -17,6 +17,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from analytics.run_catalog import (  # noqa: E402
+    get_basin_coordinates,
     get_monthly_summary,
     get_run,
     get_run_basin_metrics,
@@ -231,6 +232,10 @@ def prediction_frame(run_id: str, api_url: str, use_api: bool) -> pd.DataFrame:
         frame["residual"] = frame["predicted"] - frame["observed"]
         return frame
     return get_run_predictions(run_id)
+
+
+def basin_coordinate_frame() -> pd.DataFrame:
+    return get_basin_coordinates()
 
 
 def format_metric(value: Any, digits: int = 3) -> str:

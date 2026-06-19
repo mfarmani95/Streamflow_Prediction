@@ -1,6 +1,7 @@
 """Utilities for serving and exploring evaluated model run artifacts."""
 
 from analytics.run_catalog import (
+    get_basin_coordinates,
     get_monthly_summary,
     get_run_predictions,
     get_run,
@@ -10,6 +11,7 @@ from analytics.run_catalog import (
 )
 
 __all__ = [
+    "get_basin_coordinates",
     "get_monthly_summary",
     "get_run_predictions",
     "get_run",
