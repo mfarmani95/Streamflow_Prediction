@@ -348,6 +348,40 @@ def prepare_overview_frame(runs: list[dict]) -> pd.DataFrame:
     return overview.sort_values("nse", ascending=False).reset_index(drop=True)
 
 
+def prepare_experiment_frame(runs: list[dict]) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    for run in runs:
+        config = run.get("config", {}) or {}
+        overall = run.get("overall", {}) or {}
+        rows.append(
+            {
+                "run_id": run.get("run_id"),
+                "run_label": str(run.get("run_id", "")).split("/")[-1],
+                "model": run.get("model"),
+                "loss": run.get("loss"),
+                "seq_len": run.get("seq_len"),
+                "batch_size": run.get("batch_size"),
+                "learning_rate": run.get("learning_rate"),
+                "hidden_size": config.get("hidden_size"),
+                "num_layers": config.get("num_layers"),
+                "dropout": config.get("dropout"),
+                "nhead": config.get("nhead"),
+                "dim_feedforward": config.get("dim_feedforward"),
+                "forecast_horizon": config.get("forecast_horizon"),
+                "split_strategy": config.get("split_strategy"),
+                "train_basin_count": config.get("train_basin_count"),
+                "val_basin_count": config.get("val_basin_count"),
+                "test_basin_count": config.get("test_basin_count"),
+                "nse": overall.get("nse"),
+                "kge": overall.get("kge"),
+                "rmse": overall.get("rmse"),
+                "mae": overall.get("mae"),
+                "mse": overall.get("mse"),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def render_section_header(kicker: str, title: str) -> None:
     st.markdown(
         f"""
@@ -454,6 +488,39 @@ def render_histogram(frame: pd.DataFrame, field: str, bins: int = 40, color: str
         .properties(height=320)
         .configure_view(strokeOpacity=0)
         .configure_axis(labelColor=MUTED, titleColor=INK, gridColor="rgba(15, 23, 42, 0.08)")
+    )
+    st.altair_chart(chart, use_container_width=True)
+
+
+def render_line_chart(
+    frame: pd.DataFrame,
+    x_field: str,
+    y_field: str,
+    series_field: str | None = None,
+    height: int = 360,
+) -> None:
+    base = alt.Chart(frame).encode(
+        x=alt.X(f"{x_field}:Q", title=x_field.replace("_", " ").title()),
+        y=alt.Y(f"{y_field}:Q", title=y_field.upper()),
+        tooltip=[
+            alt.Tooltip("run_label:N", title="Run"),
+            alt.Tooltip(f"{x_field}:Q", title=x_field.replace("_", " ").title()),
+            alt.Tooltip(f"{y_field}:Q", title=y_field.upper(), format=".3f"),
+        ],
+    )
+    if series_field and series_field != "none":
+        base = base.encode(
+            color=alt.Color(f"{series_field}:N", title=series_field.replace("_", " ").title()),
+        )
+    else:
+        base = base.encode(color=alt.value(ACCENT))
+
+    chart = (
+        (base.mark_line(strokeWidth=2.4) + base.mark_circle(size=70, filled=True))
+        .properties(height=height)
+        .configure_view(strokeOpacity=0)
+        .configure_axis(labelColor=MUTED, titleColor=INK, gridColor="rgba(15, 23, 42, 0.08)")
+        .configure_legend(labelColor=INK, titleColor=INK)
     )
     st.altair_chart(chart, use_container_width=True)
 

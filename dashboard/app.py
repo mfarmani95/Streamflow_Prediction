@@ -34,15 +34,20 @@ evaluation_page = st.Page(
     title="Evaluation",
     icon=":material/analytics:",
 )
+scenario_page = st.Page(
+    "pages/3_Scenario_Analysis.py",
+    title="Scenario Analysis",
+    icon=":material/timeline:",
+)
 configuration_page = st.Page(
-    "pages/3_Configuration.py",
+    "pages/4_Configuration.py",
     title="Configuration",
     icon=":material/tune:",
 )
 
 pg = st.navigation(
     {
-        "Explore": [overview_page, basin_page, evaluation_page],
+        "Explore": [overview_page, basin_page, evaluation_page, scenario_page],
         "Run Metadata": [configuration_page],
     },
     position="sidebar",
