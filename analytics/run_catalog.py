@@ -157,6 +157,14 @@ def _load_predictions(predictions_path: Path) -> pd.DataFrame:
     return frame.sort_values(["basin_id", "date"]).reset_index(drop=True)
 
 
+def get_run_predictions(
+    run_id: str,
+    run_roots: Optional[Iterable[Path | str]] = None,
+) -> pd.DataFrame:
+    """Return all prediction rows for one run."""
+    return _load_predictions(_predictions_path_for_run(run_id, run_roots))
+
+
 def get_run_timeseries(
     run_id: str,
     basin_id: str,

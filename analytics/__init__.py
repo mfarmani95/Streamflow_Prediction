@@ -2,6 +2,7 @@
 
 from analytics.run_catalog import (
     get_monthly_summary,
+    get_run_predictions,
     get_run,
     get_run_basin_metrics,
     get_run_timeseries,
@@ -10,6 +11,7 @@ from analytics.run_catalog import (
 
 __all__ = [
     "get_monthly_summary",
+    "get_run_predictions",
     "get_run",
     "get_run_basin_metrics",
     "get_run_timeseries",
