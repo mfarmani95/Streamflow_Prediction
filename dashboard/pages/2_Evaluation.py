@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import pandas as pd
 import streamlit as st
 
-from dashboard.shared import (
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from dashboard.shared import (  # noqa: E402
     configure_page,
     prediction_frame,
     render_histogram,
