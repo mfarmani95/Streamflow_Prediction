@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import sys
 from pathlib import Path
@@ -16,15 +17,23 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from analytics.run_catalog import (  # noqa: E402
-    get_basin_coordinates,
-    get_monthly_summary,
-    get_run,
-    get_run_basin_metrics,
-    get_run_predictions,
-    get_run_timeseries,
-    list_runs,
+RUN_CATALOG_PATH = REPO_ROOT / "analytics" / "run_catalog.py"
+RUN_CATALOG_SPEC = importlib.util.spec_from_file_location(
+    "streamflow_run_catalog",
+    RUN_CATALOG_PATH,
 )
+if RUN_CATALOG_SPEC is None or RUN_CATALOG_SPEC.loader is None:
+    raise ImportError(f"Could not load run catalog module from {RUN_CATALOG_PATH}")
+RUN_CATALOG = importlib.util.module_from_spec(RUN_CATALOG_SPEC)
+RUN_CATALOG_SPEC.loader.exec_module(RUN_CATALOG)
+
+get_basin_coordinates = RUN_CATALOG.get_basin_coordinates
+get_monthly_summary = RUN_CATALOG.get_monthly_summary
+get_run = RUN_CATALOG.get_run
+get_run_basin_metrics = RUN_CATALOG.get_run_basin_metrics
+get_run_predictions = RUN_CATALOG.get_run_predictions
+get_run_timeseries = RUN_CATALOG.get_run_timeseries
+list_runs = RUN_CATALOG.list_runs
 
 
 DEFAULT_API_URL = os.getenv("STREAMFLOW_API_URL", "http://127.0.0.1:8000")
