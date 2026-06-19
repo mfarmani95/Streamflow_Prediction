@@ -38,6 +38,7 @@ def _scenario_subset(
     anchor_row: pd.Series,
     x_field: str,
     series_field: str | None,
+    model_value: str,
 ) -> pd.DataFrame:
     compare_fields = [
         "model",
@@ -61,6 +62,7 @@ def _scenario_subset(
         ignored.add(series_field)
 
     subset = frame.copy()
+    subset = subset[subset["model"] == model_value]
     for field in compare_fields:
         if field in ignored or field not in subset.columns:
             continue
@@ -85,25 +87,44 @@ def main() -> None:
 
     control_left, control_mid, control_right = st.columns([1, 1, 1.1])
     with control_left:
-        x_field = st.selectbox("X-axis hyperparameter", options=SCENARIO_FIELDS, index=0)
+        model_options = sorted([value for value in experiments["model"].dropna().unique().tolist() if value])
+        default_model = anchor_row["model"] if anchor_row["model"] in model_options else model_options[0]
+        model_value = st.selectbox(
+            "Model family",
+            options=model_options,
+            index=model_options.index(default_model),
+        )
     with control_mid:
-        metric_field = st.selectbox("Performance metric", options=METRIC_FIELDS, index=0)
+        x_field = st.selectbox("X-axis hyperparameter", options=SCENARIO_FIELDS, index=0)
     with control_right:
+        metric_field = st.selectbox("Performance metric", options=METRIC_FIELDS, index=0)
+    control_fourth, control_fifth = st.columns([1, 1.1])
+    with control_fourth:
         series_field = st.selectbox(
             "Split lines by",
             options=["none"] + [field for field in SCENARIO_FIELDS if field != x_field],
             index=0,
         )
+    with control_fifth:
+        match_anchor = st.toggle("Match selected run settings", value=True)
 
-    subset = _scenario_subset(experiments, anchor_row, x_field, series_field)
+    subset = _scenario_subset(experiments, anchor_row, x_field, series_field, model_value=model_value)
+    if not match_anchor:
+        relaxed_fields = {x_field}
+        if series_field != "none":
+            relaxed_fields.add(series_field)
+        subset = experiments[experiments["model"] == model_value].copy()
+        subset = subset.dropna(subset=[x_field, metric_field])
+        if series_field != "none":
+            subset = subset.dropna(subset=[series_field])
     subset = subset.dropna(subset=[x_field, metric_field]).sort_values(x_field)
 
     st.markdown(
         f"""
         <div class="context-band">
+            Model family: <strong>{model_value.upper()}</strong>.
             Anchor run: <strong>{anchor_row['run_label']}</strong>.
-            The scenario view keeps the other experiment settings fixed and varies
-            <strong>{x_field}</strong>{'' if series_field == 'none' else f' plus {series_field}'}.
+            {"The scenario view keeps the other experiment settings fixed to the selected run." if match_anchor else "The scenario view is relaxed to all runs from the selected model family."}
         </div>
         """,
         unsafe_allow_html=True,
@@ -112,7 +133,7 @@ def main() -> None:
     if subset.empty or subset[x_field].nunique() < 2:
         st.info(
             "Not enough matching runs were found to compare this scenario. "
-            "Try a different hyperparameter or choose another anchor run."
+            "Try a different hyperparameter, choose another model, or disable anchor matching."
         )
         st.stop()
 
