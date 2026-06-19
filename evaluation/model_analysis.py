@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from argparse import Namespace
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Sequence
+from typing import Any, Dict, Iterable, Mapping, Sequence
 
 import matplotlib
 

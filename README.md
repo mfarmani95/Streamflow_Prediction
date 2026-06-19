@@ -6,6 +6,9 @@ This project implements HWRS640 Assignment 4.
 
 - `main.py` - root CLI entry point
 - `cli/` - command-line parsing and orchestration
+- `analytics/` - reusable run-catalog helpers for APIs and dashboards
+- `api/` - FastAPI service for browsing evaluated runs
+- `dashboard/` - Streamlit app for stakeholder-facing exploration
 - `dataset/` - MiniCAMELS access, preprocessing, sequence dataset, dataloaders
 - `model/` - sequence models such as LSTM and Transformer
 - `training/` - trainer, losses, checkpointing, early stopping
@@ -68,6 +71,68 @@ If MiniCAMELS is missing, install it directly from GitHub:
 ```bash
 python3 -m pip install git+https://github.com/BennettHydroLab/minicamels.git
 ```
+
+## Production-Oriented Additions
+
+This repository now includes a lightweight application layer around completed
+model runs so you can demonstrate more than offline training:
+
+- `FastAPI` service to expose evaluated run artifacts as JSON
+- `Streamlit` dashboard to compare runs and inspect basin time series
+- `DuckDB`-backed artifact loading path for fast CSV analytics
+- GitHub Actions CI for linting and tests on every push or pull request
+
+The idea is to make the repo look closer to a real climate-tech or
+environmental analytics stack: train a model, evaluate it, then serve the
+outputs through an API and dashboard.
+
+## Run The API
+
+The API serves evaluated run directories discovered under `output/` and
+`outputs/`. A run is considered discoverable when it contains
+`test_metrics.json` and `test_predictions.csv`.
+
+```bash
+uvicorn api.main:app --reload
+```
+
+Useful endpoints:
+
+- `GET /health`
+- `GET /runs`
+- `GET /runs/{run_id}`
+- `GET /runs/{run_id}/basins`
+- `GET /runs/{run_id}/basins/{basin_id}/timeseries`
+- `GET /runs/{run_id}/monthly`
+
+To point the API at custom run roots, set:
+
+```bash
+export STREAMFLOW_RUN_ROOTS=/path/to/run_root_one,/path/to/run_root_two
+```
+
+## Run The Dashboard
+
+Start the API first, then launch the dashboard:
+
+```bash
+streamlit run dashboard/app.py
+```
+
+If your API is not on `http://127.0.0.1:8000`, update the sidebar URL field or:
+
+```bash
+export STREAMFLOW_API_URL=http://127.0.0.1:8000
+streamlit run dashboard/app.py
+```
+
+## CI
+
+The repository includes a GitHub Actions workflow at
+`.github/workflows/ci.yml` that runs:
+
+- `ruff check .`
+- `pytest`
 
 ### Inspect and Analyze the Dataset
 
