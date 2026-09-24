@@ -1,28 +1,28 @@
-# Streamflow Prediction with Sequence Models
+# Streamflow Prediction with LSTM and Transformer Models
 
-This project implements HWRS640 Assignment 4.
+A machine learning project for predicting streamflow in CAMELS
+catchments and exploring model performance across watersheds.
 
-## Structure
+## Problem
 
-- `main.py` - root CLI entry point
-- `cli/` - command-line parsing and orchestration
-- `analytics/` - reusable run-catalog helpers for APIs and dashboards
-- `api/` - FastAPI service for browsing evaluated runs
-- `dashboard/` - Streamlit app for stakeholder-facing exploration
-- `dataset/` - MiniCAMELS access, preprocessing, sequence dataset, dataloaders
-- `model/` - sequence models such as LSTM and Transformer
-- `training/` - trainer, losses, checkpointing, early stopping
-- `evaluation/` - test-time evaluation workflows
-- `util/` - config, metrics, data utilities, logging utilities
-- `visualization.py` - plotting functions
-- `configs/` - reusable experiment configuration files
-- `outputs/` - checkpoints, metrics, and figures
+Streamflow prediction supports water-resource planning and
+environmental assessment. This project compares LSTM and Transformer
+models and provides tools for examining where their predictions
+perform well and where they fail.
 
-The assignment lists `data.py`, `train.py`, `utils.py`, and `model.py` as simple
-module names. This repository keeps the folder structure you requested. Thin
-compatibility modules are included for `data.py`, `train.py`, and `utils.py`.
-The model code lives in the `model/` package, because a repository cannot have
-both a root `model.py` file and a `model/` directory with the same name.
+## What I Built
+
+- A modular workflow for data preparation, model training,
+  checkpointing, and evaluation.
+- Configurable experiments for comparing sequence models.
+- A FastAPI service for accessing evaluated model outputs.
+- A Streamlit dashboard for exploring runs and basin time series.
+- GitHub Actions workflows for linting and automated tests.
+
+## Project Background
+
+This project began as HWRS640 Assignment 4 and was extended with
+an API, an interactive dashboard, and software quality checks.
 
 ## Setup
 
