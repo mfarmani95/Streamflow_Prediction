@@ -1,28 +1,70 @@
-# Streamflow Prediction with LSTM and Transformer Models
+# Streamflow Prediction with LSTM and Transformers
 
-A machine learning project for predicting streamflow in CAMELS
-catchments and exploring model performance across watersheds.
+Machine learning for streamflow prediction across catchments, with reproducible
+experiments, model evaluation, an API, and an interactive dashboard.
 
-## Problem
+[Dashboard](https://streamflowprediction-irm8aele3vtve9ujyfys62.streamlit.app/) ·
+[Evaluation report](reports/problem4/problem4_report.md) ·
+[Research portfolio](https://mfarmani95.github.io/Mfarmani/index.html)
 
-Streamflow prediction supports water-resource planning and
-environmental assessment. This project compares LSTM and Transformer
-models and provides tools for examining where their predictions
-perform well and where they fail.
+## Project at a Glance
 
-## What I Built
+- **Problem:** predict streamflow from daily meteorological sequences and catchment attributes, and evaluate generalization to held-out basins.
+- **Models:** PyTorch LSTM and Transformer implementations with configurable training and hyperparameter sweeps.
+- **Engineering:** modular data loaders, checkpointing, FastAPI access to evaluated outputs, a Streamlit dashboard, DuckDB-backed artifact analytics, and GitHub Actions for linting and tests.
+- **Evaluation:** separate training, validation, and test basins; training-only normalization; basin-level, seasonal, and flow-regime analysis.
 
-- A modular workflow for data preparation, model training,
-  checkpointing, and evaluation.
-- Configurable experiments for comparing sequence models.
-- A FastAPI service for accessing evaluated model outputs.
-- A Streamlit dashboard for exploring runs and basin time series.
-- GitHub Actions workflows for linting and automated tests.
+## Selected Evaluation Results
+
+The committed report compares runs trained on 30 basins, validated on 10, and
+evaluated on 10 held-out basins. These are the saved experiment results, not a
+claim that one architecture is universally better.
+
+| Model | Overall NSE | Overall KGE | Median per-basin KGE |
+| --- | ---: | ---: | ---: |
+| LSTM | 0.5238 | 0.7593 | 0.5448 |
+| Transformer | 0.2765 | 0.6265 | 0.2889 |
+
+Sources: [overall metrics](reports/problem4/model_comparison/model_metrics_summary.csv)
+and [catchment KGE summary](reports/problem4/model_comparison/basin_kge_cdf_summary_by_model.csv).
+Overall metrics and medians across basins summarize different aspects of performance.
+
+![Distribution of KGE across held-out catchments](reports/problem4/model_comparison/basin_kge_cdf_comparison.png)
+
+**Limitations:** these experiments use 120-day sequences with stride 120, producing
+one target prediction per non-overlapping window rather than a continuous daily
+prediction series. The LSTM and Transformer runs also use different training losses
+(NSE and MSE, respectively). Some test basins have negative KGE, and low-flow and
+peak-flow behavior remain challenging. See the report for the full configurations
+and failure analysis. This is a research portfolio project, not an operational forecast service.
 
 ## Project Background
 
-This project began as HWRS640 Assignment 4 and was extended with
-an API, an interactive dashboard, and software quality checks.
+This project began as HWRS640 Assignment 4 and includes an application layer for
+exploring completed experiments. Coursework attribution is retained alongside the
+training, evaluation, API, and dashboard implementation.
+
+## Structure
+
+- `main.py` - root CLI entry point
+- `cli/` - command-line parsing and orchestration
+- `analytics/` - reusable run-catalog helpers for APIs and dashboards
+- `api/` - FastAPI service for browsing evaluated runs
+- `dashboard/` - Streamlit app for stakeholder-facing exploration
+- `dataset/` - MiniCAMELS access, preprocessing, sequence dataset, dataloaders
+- `model/` - sequence models such as LSTM and Transformer
+- `training/` - trainer, losses, checkpointing, early stopping
+- `evaluation/` - test-time evaluation workflows
+- `util/` - config, metrics, data utilities, logging utilities
+- `visualization.py` - plotting functions
+- `configs/` - reusable experiment configuration files
+- `outputs/` - checkpoints, metrics, and figures
+
+The assignment lists `data.py`, `train.py`, `utils.py`, and `model.py` as simple
+module names. The implementation groups these responsibilities into packages. Thin
+compatibility modules are included for `data.py`, `train.py`, and `utils.py`.
+The model code lives in the `model/` package, because a repository cannot have
+both a root `model.py` file and a `model/` directory with the same name.
 
 ## Setup
 
@@ -75,16 +117,15 @@ python3 -m pip install git+https://github.com/BennettHydroLab/minicamels.git
 ## Production-Oriented Additions
 
 This repository now includes a lightweight application layer around completed
-model runs so you can demonstrate more than offline training:
+model runs for inspecting and sharing model outputs:
 
 - `FastAPI` service to expose evaluated run artifacts as JSON
 - `Streamlit` dashboard to compare runs and inspect basin time series
 - `DuckDB`-backed artifact loading path for fast CSV analytics
 - GitHub Actions CI for linting and tests on every push or pull request
 
-The idea is to make the repo look closer to a real climate-tech or
-environmental analytics stack: train a model, evaluate it, then serve the
-outputs through an API and dashboard.
+The application layer serves completed evaluation artifacts through an API and
+dashboard; it does not run an operational forecasting service.
 
 ## Run The API
 
